@@ -22,6 +22,9 @@
                         <a href="/pdfs" class="nav-link {% if request.path == '/pdfs' %}active{% endif %}">
                             <i class="fas fa-file-pdf mr-2"></i>PDFs
                         </a>
+                        <a href="/upload" class="nav-link {% if request.path == '/upload' %}active{% endif %}">
+                            <i class="fas fa-upload mr-2"></i>Upload
+                        </a>
                         <a href="/results" class="nav-link {% if request.path == '/results' %}active{% endif %}">
                             <i class="fas fa-chart-bar mr-2"></i>Results
                         </a>
@@ -59,6 +62,9 @@
                 </a>
                 <a href="/pdfs" class="mobile-nav-link {% if request.path == '/pdfs' %}active{% endif %}">
                     <i class="fas fa-file-pdf mr-2"></i>PDFs
+                </a>
+                <a href="/upload" class="mobile-nav-link {% if request.path == '/upload' %}active{% endif %}">
+                    <i class="fas fa-upload mr-2"></i>Upload
                 </a>
                 <a href="/results" class="mobile-nav-link {% if request.path == '/results' %}active{% endif %}">
                     <i class="fas fa-chart-bar mr-2"></i>Results

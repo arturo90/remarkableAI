@@ -45,6 +45,11 @@ async def settings_page(request: Request):
     """Settings page."""
     return templates.TemplateResponse("settings.html", {"request": request})
 
+@app.get("/upload")
+async def upload_page(request: Request):
+    """PDF upload page."""
+    return templates.TemplateResponse("upload.html", {"request": request})
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

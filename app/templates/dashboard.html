@@ -15,7 +15,7 @@
         </div>
 
         <!-- Main Action Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
             <!-- Sync & Process -->
             <div class="bg-white rounded-2xl shadow-lg p-8 border border-gray-100 hover:shadow-xl transition-all duration-300">
                 <div class="text-center">
@@ -29,6 +29,22 @@
                     <button onclick="syncAndProcess()" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105">
                         <i class="fas fa-magic mr-2"></i>Sync & Process All
                     </button>
+                </div>
+            </div>
+
+            <!-- Upload Notes -->
+            <div class="bg-white rounded-2xl shadow-lg p-8 border border-gray-100 hover:shadow-xl transition-all duration-300">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-upload text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Upload Notes</h3>
+                    <p class="text-gray-600 mb-6">
+                        Manually upload PDF notes and process them with AI. Perfect for notes from other sources.
+                    </p>
+                    <a href="/upload" class="block w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-orange-600 hover:to-orange-700 transition-all duration-200 transform hover:scale-105">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i>Upload PDF
+                    </a>
                 </div>
             </div>
 

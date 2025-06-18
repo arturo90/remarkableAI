@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload PDF - RemarkableAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #d1d5db;
+            transition: all 0.3s ease;
+        }
+        .upload-area.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-semibold text-gray-900">RemarkableAI</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                    <a href="/pdfs" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-file-pdf mr-2"></i>PDFs
+                    </a>
+                    <a href="/upload" class="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-upload mr-2"></i>Upload
+                    </a>
+                    <a href="/results" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-chart-bar mr-2"></i>Results
+                    </a>
+                    <a href="/settings" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-cog mr-2"></i>Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Upload Handwritten Notes</h2>
+            <p class="text-gray-600">Upload your PDF notes and let AI process them for summaries, tasks, and insights</p>
+        </div>
+
+        <!-- Upload Area -->
+        <div class="bg-white rounded-lg shadow-sm border p-8 mb-8">
+            <div id="uploadArea" class="upload-area rounded-lg p-12 text-center cursor-pointer">
+                <div class="mb-4">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Drop your PDF here</h3>
+                <p class="text-gray-600 mb-4">or click to browse files</p>
+                <input type="file" id="fileInput" accept=".pdf" class="hidden">
+                <button id="browseBtn" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                    Choose File
+                </button>
+            </div>
+        </div>
+
+        <!-- Processing Options -->
+        <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Processing Options</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-center p-4 border rounded-lg">
+                    <input type="radio" id="standardAI" name="processingType" value="standard" class="mr-3" checked>
+                    <div>
+                        <label for="standardAI" class="font-medium text-gray-900">Standard AI Processing</label>
+                        <p class="text-sm text-gray-600">Uses OCR + AI for text extraction and analysis</p>
+                    </div>
+                </div>
+                <div class="flex items-center p-4 border rounded-lg">
+                    <input type="radio" id="multimodalAI" name="processingType" value="multimodal" class="mr-3">
+                    <div>
+                        <label for="multimodalAI" class="font-medium text-gray-900">Multimodal LLM</label>
+                        <p class="text-sm text-gray-600">Uses LLaVA for superior handwritten text recognition</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Modal -->
+        <div id="progressModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+                <div class="text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-spinner fa-spin text-3xl text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Processing Your PDF</h3>
+                    <p id="progressText" class="text-gray-600 mb-4">Uploading and analyzing...</p>
+                    
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                        <div id="progressBar" class="progress-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                    
+                    <div id="progressDetails" class="text-sm text-gray-500"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="bg-white rounded-lg shadow-sm border p-6 hidden">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Processing Results</h3>
+            <div id="resultsContent"></div>
+        </div>
+
+        <!-- Recent Uploads -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Uploads</h3>
+            <div id="recentUploads" class="space-y-3">
+                <p class="text-gray-500 text-center py-8">No recent uploads</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentFile = null;
+        let uploadInProgress = false;
+
+        // DOM elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const browseBtn = document.getElementById('browseBtn');
+        const progressModal = document.getElementById('progressModal');
+        const progressText = document.getElementById('progressText');
+        const progressBar = document.getElementById('progressBar');
+        const progressDetails = document.getElementById('progressDetails');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsContent = document.getElementById('resultsContent');
+        const recentUploads = document.getElementById('recentUploads');
+
+        // Event listeners
+        uploadArea.addEventListener('click', () => fileInput.click());
+        browseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+
+        // File handling
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            uploadArea.classList.remove('dragover');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file.type.includes('pdf')) {
+                showError('Please select a PDF file');
+                return;
+            }
+
+            if (file.size > 50 * 1024 * 1024) { // 50MB limit
+                showError('File size must be less than 50MB');
+                return;
+            }
+
+            currentFile = file;
+            uploadFile();
+        }
+
+        // Upload and processing
+        async function uploadFile() {
+            if (uploadInProgress || !currentFile) return;
+            
+            uploadInProgress = true;
+            showProgressModal();
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', currentFile);
+                
+                const processingType = document.querySelector('input[name="processingType"]:checked').value;
+                const endpoint = processingType === 'multimodal' ? '/gmail/upload-pdf-multimodal' : '/gmail/upload-pdf';
+                
+                updateProgress(20, 'Uploading file...');
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+                
+                updateProgress(50, 'Processing with AI...');
+                
+                const result = await response.json();
+                
+                updateProgress(100, 'Complete!');
+                
+                setTimeout(() => {
+                    hideProgressModal();
+                    showResults(result);
+                    loadRecentUploads();
+                    uploadInProgress = false;
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                hideProgressModal();
+                showError(error.message);
+                uploadInProgress = false;
+            }
+        }
+
+        // Progress modal
+        function showProgressModal() {
+            progressModal.classList.remove('hidden');
+            progressModal.classList.add('flex');
+            updateProgress(0, 'Preparing upload...');
+        }
+
+        function hideProgressModal() {
+            progressModal.classList.add('hidden');
+            progressModal.classList.remove('flex');
+        }
+
+        function updateProgress(percent, text) {
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = text;
+        }
+
+        // Results display
+        function showResults(result) {
+            const { result: aiResult, metadata } = result;
+            
+            let html = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                        <span class="text-green-800 font-medium">Processing completed successfully!</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-medium text-gray-900 mb-2">File Information</h4>
+                        <div class="bg-gray-50 rounded p-3">
+                            <p><strong>Filename:</strong> ${metadata.filename}</p>
+                            <p><strong>Uploaded:</strong> ${new Date(metadata.date).toLocaleString()}</p>
+                            <p><strong>Processing:</strong> ${result.method || 'Standard AI'}</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-medium text-gray-900 mb-2">Quick Actions</h4>
+                        <div class="space-y-2">
+                            <a href="/results" class="block w-full bg-blue-600 text-white text-center py-2 px-4 rounded hover:bg-blue-700 transition-colors">
+                                View Full Results
+                            </a>
+                            <a href="/pdfs" class="block w-full bg-gray-600 text-white text-center py-2 px-4 rounded hover:bg-gray-700 transition-colors">
+                                Manage PDFs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (aiResult && aiResult.summary) {
+                html += `
+                    <div class="mt-6">
+                        <h4 class="font-medium text-gray-900 mb-2">AI Summary</h4>
+                        <div class="bg-gray-50 rounded p-3">
+                            <p class="text-gray-700">${aiResult.summary}</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultsContent.innerHTML = html;
+            resultsSection.classList.remove('hidden');
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Error handling
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+            errorDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        // Load recent uploads
+        async function loadRecentUploads() {
+            try {
+                const response = await fetch('/gmail/local/list-pdfs');
+                const data = await response.json();
+                
+                const uploads = data.pdfs.filter(pdf => 
+                    pdf.metadata && pdf.metadata.upload_type === 'manual'
+                ).slice(0, 5);
+                
+                if (uploads.length === 0) {
+                    recentUploads.innerHTML = '<p class="text-gray-500 text-center py-8">No recent uploads</p>';
+                    return;
+                }
+                
+                let html = '';
+                uploads.forEach(pdf => {
+                    const date = new Date(parseInt(pdf.metadata.date)).toLocaleDateString();
+                    html += `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                            <div>
+                                <p class="font-medium text-gray-900">${pdf.metadata.filename}</p>
+                                <p class="text-sm text-gray-600">Uploaded ${date}</p>
+                            </div>
+                            <a href="/results" class="text-blue-600 hover:text-blue-800 text-sm">
+                                View Results <i class="fas fa-arrow-right ml-1"></i>
+                            </a>
+                        </div>
+                    `;
+                });
+                
+                recentUploads.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading recent uploads:', error);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRecentUploads();
+        });
+    </script>
+</body>
+</html> 

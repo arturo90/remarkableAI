@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from app.services.gmail_service import GmailService
 from app.services.pdf_service import PDFService
@@ -532,4 +532,155 @@ async def view_pdf_local(message_id: str, attachment_id: str):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to view local PDF: {str(e)}"
+        )
+
+@router.post("/upload-pdf")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None
+):
+    """Upload a PDF file manually and process it with AI."""
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF files are allowed"
+            )
+        
+        # Read the uploaded file
+        pdf_data = await file.read()
+        
+        if len(pdf_data) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Empty file uploaded"
+            )
+        
+        # Create metadata for the uploaded file
+        metadata = {
+            'message_id': f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'attachment_id': f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}",
+            'subject': f"Manual Upload: {file.filename}",
+            'date': str(int(datetime.now().timestamp() * 1000)),
+            'from': 'Manual Upload',
+            'filename': file.filename,
+            'upload_type': 'manual'
+        }
+        
+        # Store the PDF locally
+        file_path = pdf_service.store_pdf(pdf_data, file.filename, metadata)
+        
+        # Initialize AI processor
+        ai_processor = AIProcessor()
+        
+        # Process the PDF with AI
+        print(f"Processing uploaded PDF: {file_path}")
+        result = ai_processor.process_pdf(file_path)
+        
+        # Store the AI result
+        if background_tasks:
+            background_tasks.add_task(
+                gmail_service.store_ai_result,
+                metadata['message_id'],
+                metadata['attachment_id'],
+                result
+            )
+        
+        return {
+            "message": "PDF uploaded and processed successfully",
+            "result": result,
+            "file_path": file_path,
+            "metadata": metadata,
+            "uploaded_at": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        print(f"Unexpected error in upload_pdf: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload and process PDF: {str(e)}"
+        )
+
+@router.post("/upload-pdf-multimodal")
+async def upload_pdf_multimodal(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None
+):
+    """Upload a PDF file manually and process it with multimodal LLM."""
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF files are allowed"
+            )
+        
+        # Read the uploaded file
+        pdf_data = await file.read()
+        
+        if len(pdf_data) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Empty file uploaded"
+            )
+        
+        # Create metadata for the uploaded file
+        metadata = {
+            'message_id': f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'attachment_id': f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}",
+            'subject': f"Manual Upload: {file.filename}",
+            'date': str(int(datetime.now().timestamp() * 1000)),
+            'from': 'Manual Upload',
+            'filename': file.filename,
+            'upload_type': 'manual'
+        }
+        
+        # Store the PDF locally
+        file_path = pdf_service.store_pdf(pdf_data, file.filename, metadata)
+        
+        # Initialize AI processor with multimodal provider
+        ai_processor = AIProcessor()
+        # Temporarily set provider to multimodal for this request
+        original_provider = ai_processor.provider
+        ai_processor.provider = "multimodal"
+        
+        # Process the PDF with multimodal LLM
+        print(f"Processing uploaded PDF with multimodal LLM: {file_path}")
+        result = ai_processor.process_with_multimodal_llm(file_path)
+        
+        # Restore original provider
+        ai_processor.provider = original_provider
+        
+        # Store the AI result
+        if background_tasks:
+            background_tasks.add_task(
+                gmail_service.store_ai_result,
+                metadata['message_id'],
+                metadata['attachment_id'],
+                result
+            )
+        
+        return {
+            "message": "PDF uploaded and processed with multimodal LLM successfully",
+            "result": result,
+            "file_path": file_path,
+            "metadata": metadata,
+            "uploaded_at": datetime.now().isoformat(),
+            "method": "multimodal_llava"
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        print(f"Unexpected error in upload_pdf_multimodal: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload and process PDF with multimodal LLM: {str(e)}"
         ) 
