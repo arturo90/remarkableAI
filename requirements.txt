@@ -1,0 +1,48 @@
+# Core Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+pydantic>=2.7.0
+pydantic-settings>=2.0.0
+jinja2==3.1.2
+python-multipart==0.0.6
+
+# Gmail Integration
+google-auth==2.23.4
+google-auth-oauthlib==1.1.0
+google-auth-httplib2==0.1.1
+google-api-python-client==2.108.0
+
+# PDF Processing
+PyPDF2==3.0.1
+pdf2image==1.16.3
+Pillow==10.0.1
+
+# OCR Processing
+pytesseract==0.3.10
+
+# OpenAI Integration
+openai==0.28.1
+
+# Additional utilities
+requests==2.31.0
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+
+# Development Tools
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.0
+
+# Security
+python-jose==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1 

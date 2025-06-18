@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - RemarkableAI{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-8">Dashboard</h1>
+    
+    <!-- Gmail Integration Status -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4">Gmail Integration Status</h2>
+        <div id="gmail-status" class="flex items-center">
+            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-3"></div>
+            <span>Checking status...</span>
+        </div>
+    </div>
+
+    <!-- Recent PDF Attachments -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4">Recent PDF Attachments</h2>
+        <div id="pdf-list" class="space-y-4">
+            <div class="animate-pulse">
+                <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Tasks -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold mb-4">Recent Tasks</h2>
+        <div id="task-list" class="space-y-4">
+            <div class="animate-pulse">
+                <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function updateGmailStatus() {
+    try {
+        const response = await fetch('/gmail/auth-status');
+        const data = await response.json();
+        const statusElement = document.getElementById('gmail-status');
+        
+        if (data.status === 'authenticated') {
+            statusElement.innerHTML = `
+                <div class="text-green-500 mr-2">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <span>Connected to Gmail</span>
+            `;
+        } else {
+            statusElement.innerHTML = `
+                <div class="text-red-500 mr-2">
+                    <i class="fas fa-times-circle"></i>
+                </div>
+                <span>Not connected to Gmail${data.error ? `: ${data.error}` : ''}</span>
+            `;
+        }
+    } catch (error) {
+        console.error('Error checking Gmail status:', error);
+        document.getElementById('gmail-status').innerHTML = `
+            <div class="text-red-500 mr-2">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <span>Error checking Gmail status</span>
+        `;
+    }
+}
+
+async function updatePdfList() {
+    try {
+        const response = await fetch('/gmail/fetch-pdfs');
+        const pdfs = await response.json();
+        const pdfListElement = document.getElementById('pdf-list');
+        
+        if (pdfs.length === 0) {
+            pdfListElement.innerHTML = '<p class="text-gray-500">No PDF attachments found</p>';
+            return;
+        }
+
+        pdfListElement.innerHTML = pdfs.map(pdf => `
+            <div class="border rounded-lg p-4 hover:bg-gray-50">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-medium">${pdf.subject}</h3>
+                        <p class="text-sm text-gray-500">${new Date(pdf.date).toLocaleString()}</p>
+                    </div>
+                    <a href="/gmail/download/${pdf.message_id}/${pdf.attachment_id}" 
+                       class="text-blue-500 hover:text-blue-700"
+                       download>
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error fetching PDFs:', error);
+        document.getElementById('pdf-list').innerHTML = `
+            <div class="text-red-500">
+                <i class="fas fa-exclamation-circle"></i>
+                Error loading PDFs
+            </div>
+        `;
+    }
+}
+
+// Update status and PDF list when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    updateGmailStatus();
+    updatePdfList();
+});
+</script>
+{% endblock %} 
