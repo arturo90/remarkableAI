@@ -160,9 +160,50 @@
     </div>
 </div>
 
+<!-- PDF Viewer Modal -->
+<div id="pdf-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-900" id="pdf-modal-title">Original PDF</h3>
+                    <p class="text-sm text-gray-500" id="pdf-modal-subtitle">View the original handwritten note</p>
+                </div>
+                <button onclick="closePdfModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Content -->
+            <div class="flex-1 p-6 overflow-hidden">
+                <div class="w-full h-full border border-gray-200 rounded-lg overflow-hidden">
+                    <iframe id="pdf-iframe" class="w-full h-full" frameborder="0"></iframe>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-between p-6 border-t border-gray-200">
+                <div class="text-sm text-gray-500">
+                    <span id="pdf-modal-info">Click outside or press ESC to close</span>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="downloadPdf()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-download mr-2"></i>Download
+                    </button>
+                    <button onclick="closePdfModal()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 let allResults = [];
 let currentTab = 'tasks';
+let currentPdfUrl = '';
 
 // Load results data
 async function loadResults() {
@@ -375,7 +416,9 @@ function showTasks(results, taskFilter) {
                         task: task.trim(),
                         document: result.filename || result.metadata?.subject || 'Unknown',
                         date: result.processed_at || 'Unknown',
-                        confidence: result.result.confidence || 0.8
+                        confidence: result.result.confidence || 0.8,
+                        messageId: result.message_id,
+                        attachmentId: result.attachment_id
                     });
                 }
             });
@@ -409,6 +452,12 @@ function showTasks(results, taskFilter) {
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         ${Math.round(task.confidence * 100)}% confidence
                     </span>
+                    ${task.messageId && task.attachmentId ? `
+                        <button onclick="viewOriginalPdf('${task.messageId}', '${task.attachmentId}', '${task.document}')" 
+                                class="text-blue-600 hover:text-blue-800 transition-colors">
+                            <i class="fas fa-eye mr-1"></i>View Original
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         </div>
@@ -437,7 +486,15 @@ function showSummaries(results) {
         <div class="bg-gray-50 rounded-xl p-6 border border-gray-100">
             <div class="flex items-center justify-between mb-4">
                 <h4 class="text-xl font-semibold text-gray-900">${result.filename || result.metadata?.subject || 'Unknown Note'}</h4>
-                <span class="text-sm text-gray-500">${new Date(result.processed_at || 'Unknown').toLocaleDateString()}</span>
+                <div class="flex items-center space-x-3">
+                    <span class="text-sm text-gray-500">${new Date(result.processed_at || 'Unknown').toLocaleDateString()}</span>
+                    ${result.message_id && result.attachment_id ? `
+                        <button onclick="viewOriginalPdf('${result.message_id}', '${result.attachment_id}', '${result.filename || result.metadata?.subject || 'Unknown Note'}')" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                            <i class="fas fa-eye mr-2"></i>View Original PDF
+                        </button>
+                    ` : ''}
+                </div>
             </div>
             <p class="text-gray-700 leading-relaxed mb-4">${result.result.summary || 'No summary available'}</p>
             <div class="flex items-center space-x-4">
@@ -462,7 +519,9 @@ function showTopics(results) {
                     allTopics.push({
                         topic: topic.trim(),
                         document: result.filename || result.metadata?.subject || 'Unknown',
-                        date: result.processed_at || 'Unknown'
+                        date: result.processed_at || 'Unknown',
+                        messageId: result.message_id,
+                        attachmentId: result.attachment_id
                     });
                 }
             });
@@ -489,7 +548,15 @@ function showTopics(results) {
                 <p class="text-lg font-medium text-gray-900">${topic.topic}</p>
                 <p class="text-sm text-gray-500">From: ${topic.document}</p>
             </div>
-            <span class="text-sm text-gray-500">${new Date(topic.date).toLocaleDateString()}</span>
+            <div class="flex items-center space-x-3">
+                <span class="text-sm text-gray-500">${new Date(topic.date).toLocaleDateString()}</span>
+                ${topic.messageId && topic.attachmentId ? `
+                    <button onclick="viewOriginalPdf('${topic.messageId}', '${topic.attachmentId}', '${topic.document}')" 
+                            class="text-blue-600 hover:text-blue-800 transition-colors text-sm">
+                        <i class="fas fa-eye mr-1"></i>View Original
+                    </button>
+                ` : ''}
+            </div>
         </div>
     `).join('');
 }
@@ -505,7 +572,9 @@ function showDates(results) {
                 allDates.push({
                     date,
                     document: result.filename || result.metadata?.subject || 'Unknown',
-                    context: result.result.summary || 'No context available'
+                    context: result.result.summary || 'No context available',
+                    messageId: result.message_id,
+                    attachmentId: result.attachment_id
                 });
             });
         }
@@ -531,9 +600,59 @@ function showDates(results) {
                 <p class="text-lg font-medium text-gray-900">${dateItem.date}</p>
                 <p class="text-sm text-gray-500">From: ${dateItem.document}</p>
             </div>
-            <span class="text-sm text-gray-500">Important Date</span>
+            <div class="flex items-center space-x-3">
+                <span class="text-sm text-gray-500">Important Date</span>
+                ${dateItem.messageId && dateItem.attachmentId ? `
+                    <button onclick="viewOriginalPdf('${dateItem.messageId}', '${dateItem.attachmentId}', '${dateItem.document}')" 
+                            class="text-blue-600 hover:text-blue-800 transition-colors text-sm">
+                        <i class="fas fa-eye mr-1"></i>View Original
+                    </button>
+                ` : ''}
+            </div>
         </div>
     `).join('');
+}
+
+// View original PDF
+function viewOriginalPdf(messageId, attachmentId, documentName) {
+    try {
+        const pdfUrl = `/gmail/local/view-pdf/${messageId}/${attachmentId}`;
+        currentPdfUrl = pdfUrl;
+        
+        // Update modal content
+        document.getElementById('pdf-modal-title').textContent = documentName;
+        document.getElementById('pdf-modal-subtitle').textContent = 'Original handwritten note';
+        document.getElementById('pdf-iframe').src = pdfUrl;
+        
+        // Show modal
+        document.getElementById('pdf-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        console.log('Opening PDF:', pdfUrl);
+    } catch (error) {
+        console.error('Error opening PDF:', error);
+        showNotification('Error opening PDF: ' + error.message, 'error');
+    }
+}
+
+// Close PDF modal
+function closePdfModal() {
+    document.getElementById('pdf-modal').classList.add('hidden');
+    document.getElementById('pdf-iframe').src = '';
+    document.body.style.overflow = 'auto';
+    currentPdfUrl = '';
+}
+
+// Download PDF
+function downloadPdf() {
+    if (currentPdfUrl) {
+        const link = document.createElement('a');
+        link.href = currentPdfUrl;
+        link.download = document.getElementById('pdf-modal-title').textContent + '.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 }
 
 // Refresh results
@@ -585,6 +704,20 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('unhandledrejection', function(e) {
         console.error('Unhandled promise rejection:', e.reason);
         showNotification('Promise error: ' + e.reason, 'error');
+    });
+    
+    // Close modal on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closePdfModal();
+        }
+    });
+    
+    // Close modal on outside click
+    document.getElementById('pdf-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closePdfModal();
+        }
     });
     
     loadResults();

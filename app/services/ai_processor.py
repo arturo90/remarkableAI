@@ -230,34 +230,62 @@ class AIProcessor:
             
             openai.api_key = self.settings.OPENAI_API_KEY
             
-            prompt = f"""
-            Analyze the following text extracted from a handwritten note or document and provide:
-            1. A concise summary (2-3 sentences)
-            2. A list of actionable tasks or action items
-            3. Key topics or themes mentioned
-            4. Any important dates or deadlines
-            
-            Text to analyze:
-            {text}
-            
-            Please respond in JSON format:
-            {{
-                "summary": "brief summary here",
-                "tasks": ["task 1", "task 2", "task 3"],
-                "topics": ["topic 1", "topic 2"],
-                "dates": ["date 1", "date 2"],
-                "confidence": 0.95
-            }}
-            """
+            system_prompt = """You are a highly intelligent assistant that specializes in analyzing handwritten notes from photos, scans, or transcriptions. These notes are often from meetings, brainstorming sessions, strategy discussions, or personal planning. They may contain:
+• Unstructured or bullet-point text
+• Incomplete thoughts or shorthand
+• Crossed-out or corrected items
+• Diagrams, arrows, or visual cues
+• Non-standard formatting or grammar
+
+Your goal is to provide the user with clean, professional, and actionable outputs, in two steps:
+
+1. **Accurate Transcription (Clean-Up)**
+• Convert all handwritten content into legible, well-formatted digital text.
+• Do not modify the meaning, but feel free to improve clarity (fix spelling, grammar, and punctuation).
+• Preserve the structure or flow (e.g., bulleted lists, sections, subtopics) as much as possible.
+• If any part of the handwriting is unreadable, mark it clearly as [UNREADABLE].
+
+2. **Insightful Summary**
+• Summarize the key points, insights, and actions from the notes.
+• Group similar ideas, remove duplicates, and eliminate irrelevant information.
+• Use clear, skimmable formatting such as bullet points and short paragraphs.
+• Highlight any questions, feedback, or follow-up items noted in the text.
+• If appropriate, infer intent or implications behind the notes to support decision-making.
+
+**Tone & Output Guidelines:**
+• Use a professional, neutral tone.
+• Be concise but informative.
+• If you're unsure about the content, use phrases like "Possibly refers to…" or mark it with [Ambiguous].
+• Always return structured information in JSON format with the following fields:
+  - summary: A concise 2-3 sentence summary of the main content
+  - tasks: Array of actionable tasks, to-dos, or action items mentioned
+  - topics: Array of key topics or themes discussed
+  - dates: Array of important dates, deadlines, or time references
+  - transcription: Clean, formatted version of the original text (if applicable)
+  - confidence: Confidence score between 0.0 and 1.0"""
+
+            user_prompt = f"""Analyze the following text extracted from a handwritten note or document:
+
+{text}
+
+Please respond in JSON format:
+{{
+    "summary": "brief summary here",
+    "tasks": ["task 1", "task 2", "task 3"],
+    "topics": ["topic 1", "topic 2"],
+    "dates": ["date 1", "date 2"],
+    "transcription": "clean formatted version of the text",
+    "confidence": 0.95
+}}"""
             
             print("Sending request to OpenAI...")
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that analyzes handwritten notes and documents to extract key information."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=500,
+                max_tokens=1000,
                 temperature=0.3
             )
             
@@ -277,6 +305,7 @@ class AIProcessor:
                     "tasks": [],
                     "topics": [],
                     "dates": [],
+                    "transcription": text,
                     "confidence": 0.8
                 }
                 
@@ -311,42 +340,108 @@ class AIProcessor:
         try:
             print(f"Processing text with local model, text length: {len(text)}")
             
-            # For now, we'll use a simple rule-based approach
-            # In the future, you can integrate with models like:
-            # - Ollama (llama2, mistral, etc.)
-            # - Local transformers models
-            # - Hugging Face models
-            
-            # Simple keyword-based analysis
+            # Enhanced rule-based analysis with better prompt understanding
             text_lower = text.lower()
             
             # Extract potential tasks (lines with action words)
-            action_words = ['todo', 'task', 'action', 'need to', 'must', 'should', 'will', 'going to']
+            action_words = [
+                'todo', 'task', 'action', 'need to', 'must', 'should', 'will', 'going to',
+                'do', 'complete', 'finish', 'start', 'prepare', 'review', 'check',
+                'follow up', 'call', 'email', 'meet', 'schedule', 'book', 'arrange',
+                'update', 'create', 'build', 'design', 'implement', 'test', 'deploy'
+            ]
+            
             lines = text.split('\n')
             tasks = []
             for line in lines:
-                if any(word in line.lower() for word in action_words):
-                    tasks.append(line.strip())
+                line_clean = line.strip()
+                if line_clean and any(word in line_clean.lower() for word in action_words):
+                    # Clean up the task text
+                    task_text = line_clean
+                    # Remove common prefixes
+                    for prefix in ['•', '-', '*', '→', '>', 'todo:', 'task:', 'action:']:
+                        if task_text.lower().startswith(prefix.lower()):
+                            task_text = task_text[len(prefix):].strip()
+                    if task_text:
+                        tasks.append(task_text)
             
-            # Extract potential dates
+            # Extract potential dates with enhanced patterns
             import re
-            date_pattern = r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b'
-            dates = re.findall(date_pattern, text)
+            date_patterns = [
+                r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b',  # MM/DD/YYYY or MM-DD-YYYY
+                r'\b\d{4}-\d{2}-\d{2}\b',  # YYYY-MM-DD
+                r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\b',  # Month DD, YYYY
+                r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2},?\s+\d{4}\b',  # Abbreviated months
+                r'\b\d{1,2}\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b',  # DD Month YYYY
+                r'\btoday\b', r'\btomorrow\b', r'\bnext week\b', r'\bthis week\b', r'\bnext month\b'
+            ]
             
-            # Simple summary (first few sentences)
-            sentences = text.split('.')
-            summary = '. '.join(sentences[:3]) + '.'
+            dates = []
+            for pattern in date_patterns:
+                found_dates = re.findall(pattern, text, re.IGNORECASE)
+                dates.extend(found_dates)
+            
+            # Remove duplicates and clean up dates
+            dates = list(set(dates))
+            
+            # Extract topics (look for common topic indicators and section headers)
+            topic_indicators = [
+                'topic', 'subject', 'theme', 'about', 'regarding', 'concerning',
+                'project', 'meeting', 'discussion', 'agenda', 'notes on', 'summary of'
+            ]
+            
+            topics = []
+            for line in lines:
+                line_clean = line.strip()
+                if line_clean and any(indicator in line_clean.lower() for indicator in topic_indicators):
+                    # Clean up topic text
+                    topic_text = line_clean
+                    for prefix in ['•', '-', '*', '→', '>', 'topic:', 'subject:', 'theme:']:
+                        if topic_text.lower().startswith(prefix.lower()):
+                            topic_text = topic_text[len(prefix):].strip()
+                    if topic_text and len(topic_text) > 3:
+                        topics.append(topic_text)
+            
+            # Generate a better summary
+            sentences = [s.strip() for s in text.split('.') if s.strip()]
+            if sentences:
+                # Take first 2-3 meaningful sentences
+                summary_sentences = []
+                for sentence in sentences[:3]:
+                    if len(sentence) > 20:  # Only include substantial sentences
+                        summary_sentences.append(sentence)
+                
+                if summary_sentences:
+                    summary = '. '.join(summary_sentences) + '.'
+                else:
+                    summary = "Handwritten notes containing various topics and action items."
+            else:
+                summary = "Handwritten notes requiring further analysis."
+            
+            # Clean transcription (basic formatting)
+            transcription_lines = []
+            for line in lines:
+                line_clean = line.strip()
+                if line_clean:
+                    # Basic formatting improvements
+                    if line_clean.startswith(('•', '-', '*', '→', '>')):
+                        transcription_lines.append(f"• {line_clean[1:].strip()}")
+                    else:
+                        transcription_lines.append(line_clean)
+            
+            transcription = '\n'.join(transcription_lines)
             
             result = {
                 "summary": summary,
-                "tasks": tasks[:5],  # Limit to 5 tasks
-                "topics": [],  # Would need more sophisticated analysis
+                "tasks": tasks[:10],  # Limit to 10 tasks
+                "topics": topics[:5],  # Limit to 5 topics
                 "dates": dates,
-                "confidence": 0.6,  # Lower confidence for rule-based approach
-                "method": "rule_based"
+                "transcription": transcription,
+                "confidence": 0.7,  # Improved confidence for enhanced rule-based approach
+                "method": "enhanced_rule_based"
             }
             
-            print(f"Local processing completed, found {len(tasks)} tasks, {len(dates)} dates")
+            print(f"Local processing completed, found {len(tasks)} tasks, {len(dates)} dates, {len(topics)} topics")
             return result
             
         except Exception as e:
@@ -427,18 +522,54 @@ class AIProcessor:
                 img_str = base64.b64encode(img_buffer.getvalue()).decode()
                 
                 # Prepare the prompt for handwritten note analysis
-                prompt = f"""
-                Analyze this handwritten note image and extract the following information:
-                
-                1. **Summary**: Provide a concise 2-3 sentence summary of the main content
-                2. **Tasks/Action Items**: List any tasks, to-dos, or action items mentioned
-                3. **Key Topics**: Identify the main topics or themes discussed
-                4. **Important Dates**: Extract any dates, deadlines, or time references
-                5. **Additional Notes**: Any other important information or insights
-                
-                Please respond in a structured format that can be easily parsed.
-                Focus on extracting actionable information and key insights from the handwritten content.
-                """
+                prompt = f"""You are a highly intelligent assistant that specializes in analyzing handwritten notes from photos, scans, or transcriptions. These notes are often from meetings, brainstorming sessions, strategy discussions, or personal planning. They may contain:
+• Unstructured or bullet-point text
+• Incomplete thoughts or shorthand
+• Crossed-out or corrected items
+• Diagrams, arrows, or visual cues
+• Non-standard formatting or grammar
+
+Your goal is to provide the user with clean, professional, and actionable outputs, in two steps:
+
+1. **Accurate Transcription (Clean-Up)**
+• Convert all handwritten content into legible, well-formatted digital text.
+• Do not modify the meaning, but feel free to improve clarity (fix spelling, grammar, and punctuation).
+• Preserve the structure or flow (e.g., bulleted lists, sections, subtopics) as much as possible.
+• If any part of the handwriting is unreadable, mark it clearly as [UNREADABLE].
+
+2. **Insightful Summary**
+• Summarize the key points, insights, and actions from the notes.
+• Group similar ideas, remove duplicates, and eliminate irrelevant information.
+• Use clear, skimmable formatting such as bullet points and short paragraphs.
+• Highlight any questions, feedback, or follow-up items noted in the text.
+• If appropriate, infer intent or implications behind the notes to support decision-making.
+
+**Tone & Output Guidelines:**
+• Use a professional, neutral tone.
+• Be concise but informative.
+• If you're unsure about the content, use phrases like "Possibly refers to…" or mark it with [Ambiguous].
+
+Analyze this handwritten note image and provide:
+
+**Transcription:**
+[Provide a clean, formatted version of the handwritten text]
+
+**Summary:**
+[2-3 sentence summary of the main content]
+
+**Tasks/Action Items:**
+[List any tasks, to-dos, or action items mentioned]
+
+**Key Topics:**
+[Identify the main topics or themes discussed]
+
+**Important Dates:**
+[Extract any dates, deadlines, or time references]
+
+**Additional Notes:**
+[Any other important information or insights]
+
+Focus on extracting actionable information and key insights from the handwritten content. Be thorough but concise."""
                 
                 # Call Ollama LLaVA API
                 try:
@@ -493,6 +624,7 @@ class AIProcessor:
                 "tasks": parsed_result.get("tasks", []),
                 "topics": parsed_result.get("topics", []),
                 "dates": parsed_result.get("dates", []),
+                "transcription": parsed_result.get("transcription", ""),
                 "confidence": 0.9,  # High confidence for multimodal approach
                 "method": "multimodal_llava",
                 "raw_text": total_text,
@@ -511,38 +643,165 @@ class AIProcessor:
     def _parse_multimodal_response(self, text: str) -> Dict[str, Any]:
         """Parse the multimodal LLM response to extract structured information."""
         try:
-            # Simple parsing logic - can be enhanced with more sophisticated parsing
+            # Enhanced parsing logic for structured responses
             text_lower = text.lower()
             
-            # Extract potential tasks (lines with action words)
-            action_words = ['todo', 'task', 'action', 'need to', 'must', 'should', 'will', 'going to', 'do', 'complete']
+            # Try to extract structured sections first
+            sections = {
+                'transcription': '',
+                'summary': '',
+                'tasks': [],
+                'topics': [],
+                'dates': [],
+                'additional_notes': ''
+            }
+            
+            # Look for structured sections in the response
+            current_section = None
             lines = text.split('\n')
-            tasks = []
+            
             for line in lines:
-                if any(word in line.lower() for word in action_words):
-                    tasks.append(line.strip())
+                line_clean = line.strip()
+                if not line_clean:
+                    continue
+                
+                # Check for section headers
+                if 'transcription:' in line_clean.lower():
+                    current_section = 'transcription'
+                    continue
+                elif 'summary:' in line_clean.lower():
+                    current_section = 'summary'
+                    continue
+                elif 'tasks' in line_clean.lower() or 'action items' in line_clean.lower():
+                    current_section = 'tasks'
+                    continue
+                elif 'topics' in line_clean.lower() or 'key topics' in line_clean.lower():
+                    current_section = 'topics'
+                    continue
+                elif 'dates' in line_clean.lower() or 'important dates' in line_clean.lower():
+                    current_section = 'dates'
+                    continue
+                elif 'additional notes' in line_clean.lower() or 'notes:' in line_clean.lower():
+                    current_section = 'additional_notes'
+                    continue
+                
+                # Add content to current section
+                if current_section:
+                    if current_section in ['tasks', 'topics', 'dates']:
+                        # For list sections, look for bullet points or numbered items
+                        if line_clean.startswith(('•', '-', '*', '→', '>', '1.', '2.', '3.')):
+                            content = line_clean
+                            for prefix in ['•', '-', '*', '→', '>', '1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.']:
+                                if content.startswith(prefix):
+                                    content = content[len(prefix):].strip()
+                                    break
+                            if content:
+                                sections[current_section].append(content)
+                        elif line_clean and not line_clean.startswith('['):  # Skip placeholder text
+                            sections[current_section].append(line_clean)
+                    else:
+                        # For text sections, append to existing content
+                        if sections[current_section]:
+                            sections[current_section] += ' ' + line_clean
+                        else:
+                            sections[current_section] = line_clean
             
-            # Extract potential dates
-            import re
-            date_pattern = r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b|\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\b'
-            dates = re.findall(date_pattern, text, re.IGNORECASE)
+            # Fallback extraction if structured parsing didn't work well
+            if not sections['tasks']:
+                # Extract potential tasks (lines with action words)
+                action_words = [
+                    'todo', 'task', 'action', 'need to', 'must', 'should', 'will', 'going to', 'do', 'complete',
+                    'finish', 'start', 'prepare', 'review', 'check', 'follow up', 'call', 'email', 'meet',
+                    'schedule', 'book', 'arrange', 'update', 'create', 'build', 'design', 'implement', 'test', 'deploy'
+                ]
+                
+                for line in lines:
+                    line_clean = line.strip()
+                    if line_clean and any(word in line_clean.lower() for word in action_words):
+                        # Clean up the task text
+                        task_text = line_clean
+                        for prefix in ['•', '-', '*', '→', '>', 'todo:', 'task:', 'action:']:
+                            if task_text.lower().startswith(prefix.lower()):
+                                task_text = task_text[len(prefix):].strip()
+                        if task_text and task_text not in sections['tasks']:
+                            sections['tasks'].append(task_text)
             
-            # Extract summary (first few sentences)
-            sentences = text.split('.')
-            summary = '. '.join(sentences[:3]) + '.'
+            if not sections['dates']:
+                # Extract potential dates with enhanced patterns
+                import re
+                date_patterns = [
+                    r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b',  # MM/DD/YYYY or MM-DD-YYYY
+                    r'\b\d{4}-\d{2}-\d{2}\b',  # YYYY-MM-DD
+                    r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\b',  # Month DD, YYYY
+                    r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2},?\s+\d{4}\b',  # Abbreviated months
+                    r'\b\d{1,2}\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b',  # DD Month YYYY
+                    r'\btoday\b', r'\btomorrow\b', r'\bnext week\b', r'\bthis week\b', r'\bnext month\b'
+                ]
+                
+                for pattern in date_patterns:
+                    found_dates = re.findall(pattern, text, re.IGNORECASE)
+                    sections['dates'].extend(found_dates)
+                
+                # Remove duplicates
+                sections['dates'] = list(set(sections['dates']))
             
-            # Extract topics (look for common topic indicators)
-            topic_indicators = ['topic', 'subject', 'theme', 'about', 'regarding', 'concerning']
-            topics = []
-            for line in lines:
-                if any(indicator in line.lower() for indicator in topic_indicators):
-                    topics.append(line.strip())
+            if not sections['topics']:
+                # Extract topics (look for common topic indicators and section headers)
+                topic_indicators = [
+                    'topic', 'subject', 'theme', 'about', 'regarding', 'concerning',
+                    'project', 'meeting', 'discussion', 'agenda', 'notes on', 'summary of'
+                ]
+                
+                for line in lines:
+                    line_clean = line.strip()
+                    if line_clean and any(indicator in line_clean.lower() for indicator in topic_indicators):
+                        # Clean up topic text
+                        topic_text = line_clean
+                        for prefix in ['•', '-', '*', '→', '>', 'topic:', 'subject:', 'theme:']:
+                            if topic_text.lower().startswith(prefix.lower()):
+                                topic_text = topic_text[len(prefix):].strip()
+                        if topic_text and len(topic_text) > 3 and topic_text not in sections['topics']:
+                            sections['topics'].append(topic_text)
+            
+            # Generate summary if not found
+            if not sections['summary']:
+                sentences = [s.strip() for s in text.split('.') if s.strip()]
+                if sentences:
+                    # Take first 2-3 meaningful sentences
+                    summary_sentences = []
+                    for sentence in sentences[:3]:
+                        if len(sentence) > 20:  # Only include substantial sentences
+                            summary_sentences.append(sentence)
+                    
+                    if summary_sentences:
+                        sections['summary'] = '. '.join(summary_sentences) + '.'
+                    else:
+                        sections['summary'] = "Handwritten notes containing various topics and action items."
+                else:
+                    sections['summary'] = "Handwritten notes requiring further analysis."
+            
+            # Clean transcription if not found
+            if not sections['transcription']:
+                # Use the original text as fallback transcription
+                transcription_lines = []
+                for line in lines:
+                    line_clean = line.strip()
+                    if line_clean and not line_clean.startswith('['):  # Skip placeholder text
+                        # Basic formatting improvements
+                        if line_clean.startswith(('•', '-', '*', '→', '>')):
+                            transcription_lines.append(f"• {line_clean[1:].strip()}")
+                        else:
+                            transcription_lines.append(line_clean)
+                
+                sections['transcription'] = '\n'.join(transcription_lines)
             
             return {
-                "summary": summary,
-                "tasks": tasks[:10],  # Limit to 10 tasks
-                "topics": topics[:5],  # Limit to 5 topics
-                "dates": dates,
+                "summary": sections['summary'],
+                "tasks": sections['tasks'][:10],  # Limit to 10 tasks
+                "topics": sections['topics'][:5],  # Limit to 5 topics
+                "dates": sections['dates'],
+                "transcription": sections['transcription'],
+                "additional_notes": sections['additional_notes']
             }
             
         except Exception as e:
@@ -551,5 +810,7 @@ class AIProcessor:
                 "summary": text[:200] + "..." if len(text) > 200 else text,
                 "tasks": [],
                 "topics": [],
-                "dates": []
+                "dates": [],
+                "transcription": text,
+                "additional_notes": ""
             } 
