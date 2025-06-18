@@ -4,41 +4,140 @@
 
 {% block content %}
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-8">Dashboard</h1>
-    
-    <!-- Gmail Integration Status -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold mb-4">Gmail Integration Status</h2>
-        <div id="gmail-status" class="flex items-center">
-            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-3"></div>
-            <span>Checking status...</span>
-        </div>
+    <!-- Header Section -->
+    <div class="mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">RemarkableAI Dashboard</h1>
+        <p class="text-gray-600">Process your handwritten notes from Gmail with AI</p>
     </div>
 
-    <!-- Recent PDF Attachments -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-xl font-semibold mb-4">Recent PDF Attachments</h2>
-        <div id="pdf-list" class="space-y-4">
-            <div class="animate-pulse">
-                <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">Sync PDFs</h3>
+                    <p class="text-blue-100 text-sm">Download all PDFs from Gmail</p>
+                </div>
+                <button onclick="syncPdfs()" class="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">
+                    <i class="fas fa-sync-alt mr-2"></i>Sync
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">Process All</h3>
+                    <p class="text-green-100 text-sm">Analyze all stored PDFs</p>
+                </div>
+                <button onclick="processAllPdfs()" class="bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors">
+                    <i class="fas fa-magic mr-2"></i>Process
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">View Results</h3>
+                    <p class="text-purple-100 text-sm">See AI analysis results</p>
+                </div>
+                <a href="/results" class="bg-white text-purple-600 px-4 py-2 rounded-lg hover:bg-purple-50 transition-colors">
+                    <i class="fas fa-chart-bar mr-2"></i>View
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Recent Tasks -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-xl font-semibold mb-4">Recent Tasks</h2>
-        <div id="task-list" class="space-y-4">
-            <div class="animate-pulse">
-                <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+    <!-- Status Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <!-- Gmail Status -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Gmail Status</h3>
+                <i class="fas fa-envelope text-gray-400"></i>
+            </div>
+            <div id="gmail-status" class="flex items-center">
+                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-3"></div>
+                <span class="text-gray-600">Checking...</span>
+            </div>
+        </div>
+
+        <!-- PDF Count -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Local PDFs</h3>
+                <i class="fas fa-file-pdf text-gray-400"></i>
+            </div>
+            <div id="pdf-count" class="text-2xl font-bold text-blue-600">-</div>
+            <p class="text-sm text-gray-500">Stored locally</p>
+        </div>
+
+        <!-- Processed Count -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Processed</h3>
+                <i class="fas fa-check-circle text-gray-400"></i>
+            </div>
+            <div id="processed-count" class="text-2xl font-bold text-green-600">-</div>
+            <p class="text-sm text-gray-500">AI analyzed</p>
+        </div>
+
+        <!-- Tasks Found -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Tasks Found</h3>
+                <i class="fas fa-tasks text-gray-400"></i>
+            </div>
+            <div id="tasks-count" class="text-2xl font-bold text-purple-600">-</div>
+            <p class="text-sm text-gray-500">Total tasks</p>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Recent PDFs -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Recent PDFs</h2>
+                <a href="/pdfs" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View All</a>
+            </div>
+            <div id="recent-pdfs" class="space-y-4">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Tasks -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Recent Tasks</h2>
+                <a href="/tasks" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View All</a>
+            </div>
+            <div id="recent-tasks" class="space-y-4">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+// Global state
+let dashboardData = {
+    gmailStatus: null,
+    pdfCount: 0,
+    processedCount: 0,
+    tasksCount: 0,
+    recentPdfs: [],
+    recentTasks: []
+};
+
+// Update Gmail status
 async function updateGmailStatus() {
     try {
         const response = await fetch('/gmail/auth-status');
@@ -47,71 +146,201 @@ async function updateGmailStatus() {
         
         if (data.status === 'authenticated') {
             statusElement.innerHTML = `
-                <div class="text-green-500 mr-2">
-                    <i class="fas fa-check-circle"></i>
+                <div class="flex items-center">
+                    <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                    <span class="text-green-600 font-medium">Connected</span>
                 </div>
-                <span>Connected to Gmail</span>
             `;
+            dashboardData.gmailStatus = 'authenticated';
         } else {
             statusElement.innerHTML = `
-                <div class="text-red-500 mr-2">
-                    <i class="fas fa-times-circle"></i>
+                <div class="flex items-center">
+                    <div class="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                    <span class="text-red-600 font-medium">Not Connected</span>
                 </div>
-                <span>Not connected to Gmail${data.error ? `: ${data.error}` : ''}</span>
             `;
+            dashboardData.gmailStatus = 'not_authenticated';
         }
     } catch (error) {
         console.error('Error checking Gmail status:', error);
         document.getElementById('gmail-status').innerHTML = `
-            <div class="text-red-500 mr-2">
-                <i class="fas fa-exclamation-circle"></i>
+            <div class="flex items-center">
+                <div class="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                <span class="text-yellow-600 font-medium">Error</span>
             </div>
-            <span>Error checking Gmail status</span>
         `;
     }
 }
 
-async function updatePdfList() {
+// Update PDF count and recent PDFs
+async function updatePdfData() {
     try {
-        const response = await fetch('/gmail/fetch-pdfs');
-        const pdfs = await response.json();
-        const pdfListElement = document.getElementById('pdf-list');
+        const response = await fetch('/gmail/local/list-pdfs');
+        const data = await response.json();
         
-        if (pdfs.length === 0) {
-            pdfListElement.innerHTML = '<p class="text-gray-500">No PDF attachments found</p>';
+        // Update count
+        document.getElementById('pdf-count').textContent = data.count;
+        dashboardData.pdfCount = data.count;
+        
+        // Update recent PDFs
+        const recentPdfsElement = document.getElementById('recent-pdfs');
+        if (data.pdfs.length === 0) {
+            recentPdfsElement.innerHTML = '<p class="text-gray-500 text-center py-4">No PDFs found</p>';
             return;
         }
 
-        pdfListElement.innerHTML = pdfs.map(pdf => `
-            <div class="border rounded-lg p-4 hover:bg-gray-50">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-medium">${pdf.subject}</h3>
-                        <p class="text-sm text-gray-500">${new Date(pdf.date).toLocaleString()}</p>
+        const recentPdfs = data.pdfs.slice(0, 5); // Show only 5 most recent
+        recentPdfsElement.innerHTML = recentPdfs.map(pdf => {
+            const filename = pdf.pdf.split('/').pop();
+            const date = pdf.metadata.date ? new Date(parseInt(pdf.metadata.date)).toLocaleDateString() : 'Unknown';
+            return `
+                <div class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-gray-900 truncate">${filename}</h4>
+                        <p class="text-sm text-gray-500">${date}</p>
                     </div>
-                    <a href="/gmail/download/${pdf.message_id}/${pdf.attachment_id}" 
-                       class="text-blue-500 hover:text-blue-700"
-                       download>
-                        <i class="fas fa-download"></i> Download
-                    </a>
+                    <div class="flex space-x-2">
+                        <button onclick="processPdf('${pdf.metadata.message_id}', '${pdf.metadata.attachment_id}')" 
+                                class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-magic"></i>
+                        </button>
+                        <a href="/pdfs/${encodeURIComponent(filename)}" class="text-gray-600 hover:text-gray-800">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+        
+        dashboardData.recentPdfs = recentPdfs;
     } catch (error) {
-        console.error('Error fetching PDFs:', error);
-        document.getElementById('pdf-list').innerHTML = `
-            <div class="text-red-500">
-                <i class="fas fa-exclamation-circle"></i>
-                Error loading PDFs
-            </div>
-        `;
+        console.error('Error fetching PDF data:', error);
+        document.getElementById('pdf-count').textContent = 'Error';
+        document.getElementById('recent-pdfs').innerHTML = '<p class="text-red-500 text-center py-4">Error loading PDFs</p>';
     }
 }
 
-// Update status and PDF list when page loads
+// Sync PDFs from Gmail
+async function syncPdfs() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing...';
+        button.disabled = true;
+        
+        const response = await fetch('/gmail/sync-pdfs', { method: 'POST' });
+        const data = await response.json();
+        
+        if (response.ok) {
+            showNotification('Successfully synced ' + data.count + ' PDFs', 'success');
+            updatePdfData();
+        } else {
+            showNotification('Failed to sync PDFs: ' + data.detail, 'error');
+        }
+    } catch (error) {
+        console.error('Error syncing PDFs:', error);
+        showNotification('Error syncing PDFs', 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Process all PDFs
+async function processAllPdfs() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+        button.disabled = true;
+        
+        // Get list of PDFs
+        const response = await fetch('/gmail/local/list-pdfs');
+        const data = await response.json();
+        
+        if (data.pdfs.length === 0) {
+            showNotification('No PDFs to process', 'warning');
+            return;
+        }
+        
+        // Process each PDF
+        let processed = 0;
+        for (const pdf of data.pdfs) {
+            try {
+                await fetch(`/gmail/local/process-with-ai/${pdf.metadata.message_id}/${pdf.metadata.attachment_id}`, {
+                    method: 'POST'
+                });
+                processed++;
+            } catch (error) {
+                console.error('Error processing PDF:', error);
+            }
+        }
+        
+        showNotification(`Processed ${processed} out of ${data.pdfs.length} PDFs`, 'success');
+        updateDashboardData();
+    } catch (error) {
+        console.error('Error processing PDFs:', error);
+        showNotification('Error processing PDFs', 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Process individual PDF
+async function processPdf(messageId, attachmentId) {
+    try {
+        const response = await fetch(`/gmail/local/process-with-ai/${messageId}/${attachmentId}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showNotification('PDF processed successfully', 'success');
+            updateDashboardData();
+        } else {
+            const data = await response.json();
+            showNotification('Failed to process PDF: ' + data.detail, 'error');
+        }
+    } catch (error) {
+        console.error('Error processing PDF:', error);
+        showNotification('Error processing PDF', 'error');
+    }
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'error' ? 'bg-red-500 text-white' :
+        type === 'warning' ? 'bg-yellow-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+// Update all dashboard data
+async function updateDashboardData() {
+    await Promise.all([
+        updateGmailStatus(),
+        updatePdfData()
+    ]);
+}
+
+// Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
-    updateGmailStatus();
-    updatePdfList();
+    updateDashboardData();
+    
+    // Refresh data every 30 seconds
+    setInterval(updateDashboardData, 30000);
 });
 </script>
 {% endblock %} 

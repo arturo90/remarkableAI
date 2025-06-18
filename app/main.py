@@ -30,6 +30,21 @@ async def root(request: Request):
     """Root endpoint to serve the dashboard."""
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
+@app.get("/pdfs")
+async def pdfs_page(request: Request):
+    """PDF management page."""
+    return templates.TemplateResponse("pdfs.html", {"request": request})
+
+@app.get("/results")
+async def results_page(request: Request):
+    """Results viewer page."""
+    return templates.TemplateResponse("results.html", {"request": request})
+
+@app.get("/settings")
+async def settings_page(request: Request):
+    """Settings page."""
+    return templates.TemplateResponse("settings.html", {"request": request})
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

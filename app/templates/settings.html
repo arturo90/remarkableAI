@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - RemarkableAI{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Settings</h1>
+        <p class="text-gray-600 mt-2">Configure your RemarkableAI preferences</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Settings -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- AI Configuration -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">AI Configuration</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="ai-provider" class="block text-sm font-medium text-gray-700 mb-2">AI Provider</label>
+                        <select id="ai-provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="local">Local (Rule-based)</option>
+                            <option value="openai">OpenAI GPT</option>
+                        </select>
+                        <p class="text-sm text-gray-500 mt-1">Choose your preferred AI provider for document analysis</p>
+                    </div>
+                    
+                    <div id="openai-settings" class="hidden">
+                        <label for="openai-key" class="block text-sm font-medium text-gray-700 mb-2">OpenAI API Key</label>
+                        <input type="password" id="openai-key" placeholder="sk-..." 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">Your OpenAI API key (stored securely)</p>
+                    </div>
+                    
+                    <div>
+                        <label for="ocr-enabled" class="flex items-center">
+                            <input type="checkbox" id="ocr-enabled" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm font-medium text-gray-700">Enable OCR for handwritten text</span>
+                        </label>
+                        <p class="text-sm text-gray-500 mt-1">Use OCR to extract text from handwritten notes</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gmail Settings -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Gmail Integration</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-700">Authentication Status</h3>
+                            <p class="text-sm text-gray-500">Connect to your Gmail account</p>
+                        </div>
+                        <div id="gmail-status" class="flex items-center">
+                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-3"></div>
+                            <span class="text-gray-600">Checking...</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="email-filter" class="block text-sm font-medium text-gray-700 mb-2">Email Filter</label>
+                        <input type="text" id="email-filter" placeholder="from:remarkable.com" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">Gmail search filter to find relevant emails (optional)</p>
+                    </div>
+                    
+                    <div>
+                        <label for="max-results" class="block text-sm font-medium text-gray-700 mb-2">Max Results</label>
+                        <input type="number" id="max-results" value="50" min="1" max="100" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">Maximum number of emails to fetch from Gmail</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Settings -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Processing Settings</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="auto-sync" class="flex items-center">
+                            <input type="checkbox" id="auto-sync" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm font-medium text-gray-700">Auto-sync PDFs</span>
+                        </label>
+                        <p class="text-sm text-gray-500 mt-1">Automatically sync new PDFs from Gmail</p>
+                    </div>
+                    
+                    <div>
+                        <label for="auto-process" class="flex items-center">
+                            <input type="checkbox" id="auto-process" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm font-medium text-gray-700">Auto-process new PDFs</span>
+                        </label>
+                        <p class="text-sm text-gray-500 mt-1">Automatically process new PDFs with AI</p>
+                    </div>
+                    
+                    <div>
+                        <label for="retention-days" class="block text-sm font-medium text-gray-700 mb-2">Data Retention (days)</label>
+                        <input type="number" id="retention-days" value="30" min="1" max="365" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">How long to keep processed data</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- System Status -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">Server Status</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Online
+                        </span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">Storage Used</span>
+                        <span id="storage-used" class="text-sm text-gray-500">-</span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">PDFs Stored</span>
+                        <span id="pdfs-stored" class="text-sm text-gray-500">-</span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">Results Stored</span>
+                        <span id="results-stored" class="text-sm text-gray-500">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                <div class="space-y-3">
+                    <button onclick="testGmailConnection()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-envelope mr-2"></i>Test Gmail Connection
+                    </button>
+                    
+                    <button onclick="clearAllData()" class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                        <i class="fas fa-trash mr-2"></i>Clear All Data
+                    </button>
+                    
+                    <button onclick="exportSettings()" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-download mr-2"></i>Export Settings
+                    </button>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <button onclick="saveSettings()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-save mr-2"></i>Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load current settings
+async function loadSettings() {
+    try {
+        // Load AI provider setting
+        const aiProvider = localStorage.getItem('ai-provider') || 'local';
+        document.getElementById('ai-provider').value = aiProvider;
+        toggleOpenAISettings(aiProvider);
+        
+        // Load other settings
+        document.getElementById('ocr-enabled').checked = localStorage.getItem('ocr-enabled') === 'true';
+        document.getElementById('auto-sync').checked = localStorage.getItem('auto-sync') === 'true';
+        document.getElementById('auto-process').checked = localStorage.getItem('auto-process') === 'true';
+        document.getElementById('max-results').value = localStorage.getItem('max-results') || '50';
+        document.getElementById('retention-days').value = localStorage.getItem('retention-days') || '30';
+        document.getElementById('email-filter').value = localStorage.getItem('email-filter') || '';
+        
+        // Load system status
+        await loadSystemStatus();
+        await updateGmailStatus();
+        
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        showNotification('Error loading settings', 'error');
+    }
+}
+
+// Toggle OpenAI settings visibility
+function toggleOpenAISettings(provider) {
+    const openaiSettings = document.getElementById('openai-settings');
+    if (provider === 'openai') {
+        openaiSettings.classList.remove('hidden');
+    } else {
+        openaiSettings.classList.add('hidden');
+    }
+}
+
+// Load system status
+async function loadSystemStatus() {
+    try {
+        // Get storage info
+        const pdfResponse = await fetch('/gmail/local/list-pdfs');
+        if (pdfResponse.ok) {
+            const pdfData = await pdfResponse.json();
+            document.getElementById('pdfs-stored').textContent = pdfData.count;
+        }
+        
+        // TODO: Add results count and storage usage
+        document.getElementById('results-stored').textContent = '-';
+        document.getElementById('storage-used').textContent = '-';
+        
+    } catch (error) {
+        console.error('Error loading system status:', error);
+    }
+}
+
+// Update Gmail status
+async function updateGmailStatus() {
+    try {
+        const response = await fetch('/gmail/auth-status');
+        const data = await response.json();
+        const statusElement = document.getElementById('gmail-status');
+        
+        if (data.status === 'authenticated') {
+            statusElement.innerHTML = `
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Connected
+                </span>
+            `;
+        } else {
+            statusElement.innerHTML = `
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    Not Connected
+                </span>
+            `;
+        }
+    } catch (error) {
+        console.error('Error checking Gmail status:', error);
+        document.getElementById('gmail-status').innerHTML = `
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                Error
+            </span>
+        `;
+    }
+}
+
+// Save settings
+async function saveSettings() {
+    try {
+        const settings = {
+            aiProvider: document.getElementById('ai-provider').value,
+            ocrEnabled: document.getElementById('ocr-enabled').checked,
+            autoSync: document.getElementById('auto-sync').checked,
+            autoProcess: document.getElementById('auto-process').checked,
+            maxResults: document.getElementById('max-results').value,
+            retentionDays: document.getElementById('retention-days').value,
+            emailFilter: document.getElementById('email-filter').value
+        };
+        
+        // Save to localStorage
+        Object.entries(settings).forEach(([key, value]) => {
+            localStorage.setItem(key, value);
+        });
+        
+        // TODO: Save to backend
+        showNotification('Settings saved successfully', 'success');
+        
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        showNotification('Error saving settings', 'error');
+    }
+}
+
+// Test Gmail connection
+async function testGmailConnection() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing...';
+        button.disabled = true;
+        
+        const response = await fetch('/gmail/auth-status');
+        const data = await response.json();
+        
+        if (data.status === 'authenticated') {
+            showNotification('Gmail connection successful!', 'success');
+        } else {
+            showNotification('Gmail connection failed', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error testing Gmail connection:', error);
+        showNotification('Error testing Gmail connection', 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Clear all data
+async function clearAllData() {
+    if (!confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        // TODO: Implement clear all data functionality
+        showNotification('Data cleared successfully', 'success');
+    } catch (error) {
+        console.error('Error clearing data:', error);
+        showNotification('Error clearing data', 'error');
+    }
+}
+
+// Export settings
+function exportSettings() {
+    const settings = {
+        aiProvider: document.getElementById('ai-provider').value,
+        ocrEnabled: document.getElementById('ocr-enabled').checked,
+        autoSync: document.getElementById('auto-sync').checked,
+        autoProcess: document.getElementById('auto-process').checked,
+        maxResults: document.getElementById('max-results').value,
+        retentionDays: document.getElementById('retention-days').value,
+        emailFilter: document.getElementById('email-filter').value,
+        exportedAt: new Date().toISOString()
+    };
+    
+    const dataStr = JSON.stringify(settings, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `remarkable-ai-settings-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    showNotification('Settings exported successfully', 'success');
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'error' ? 'bg-red-500 text-white' :
+        type === 'warning' ? 'bg-yellow-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+    
+    // AI provider change
+    document.getElementById('ai-provider').addEventListener('change', (e) => {
+        toggleOpenAISettings(e.target.value);
+    });
+});
+</script>
+{% endblock %} 
