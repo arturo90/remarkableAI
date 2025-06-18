@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.services.pdf_service import PDFService
 from app.services.ai_processor import AIProcessor
 from fastapi import HTTPException
+import hashlib
 
 class GmailService:
     """Service for interacting with Gmail API."""
@@ -256,14 +257,16 @@ class GmailService:
             results_dir = Path("storage/results")
             results_dir.mkdir(parents=True, exist_ok=True)
             
-            # Create result filename
-            result_filename = f"{message_id}_{attachment_id}_ai_result.json"
+            # Create a shorter filename using hash of attachment_id
+            attachment_hash = hashlib.md5(attachment_id.encode()).hexdigest()[:8]
+            result_filename = f"{message_id}_{attachment_hash}_ai_result.json"
             result_path = results_dir / result_filename
             
             # Add metadata to result
             result_with_metadata = {
                 "message_id": message_id,
                 "attachment_id": attachment_id,
+                "attachment_hash": attachment_hash,
                 "processed_at": datetime.now().isoformat(),
                 "result": result
             }
