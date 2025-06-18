@@ -6,6 +6,14 @@ from fastapi import HTTPException
 from app.core.config import get_settings
 import json
 
+# Fix for PIL.Image.ANTIALIAS compatibility issue with EasyOCR
+try:
+    from PIL import Image
+    if not hasattr(Image, 'ANTIALIAS'):
+        Image.ANTIALIAS = Image.Resampling.LANCZOS
+except ImportError:
+    pass
+
 class AIProcessor:
     """Service for processing PDFs with AI models."""
     
@@ -55,9 +63,8 @@ class AIProcessor:
                 )
     
     def extract_text_with_ocr(self, pdf_path: str) -> str:
-        """Extract text from PDF using OCR (Tesseract)."""
+        """Extract text from PDF using OCR (EasyOCR with Tesseract fallback)."""
         try:
-            import pytesseract
             from pdf2image import convert_from_path
             from PIL import Image
             
@@ -70,22 +77,50 @@ class AIProcessor:
             
             extracted_text = ""
             
-            # Process each page
-            for i, image in enumerate(images):
-                print(f"Processing page {i+1} with OCR...")
-                # Use Tesseract to extract text from the image
-                page_text = pytesseract.image_to_string(image, lang='eng')
-                extracted_text += f"\n--- Page {i+1} ---\n{page_text}\n"
-                print(f"Page {i+1} OCR completed, extracted {len(page_text)} characters")
-            
-            print(f"OCR completed, total extracted text length: {len(extracted_text)}")
-            return extracted_text.strip()
+            # Try EasyOCR first (better for handwritten text)
+            try:
+                import easyocr
+                print("Using EasyOCR for better handwritten text recognition...")
+                reader = easyocr.Reader(['en'])
+                
+                # Process each page
+                for i, image in enumerate(images):
+                    print(f"Processing page {i+1} with EasyOCR...")
+                    # Convert PIL image to numpy array for EasyOCR
+                    import numpy as np
+                    img_array = np.array(image)
+                    
+                    # Extract text with EasyOCR
+                    results = reader.readtext(img_array)
+                    page_text = ""
+                    
+                    for (bbox, text, confidence) in results:
+                        if confidence > 0.3:  # Filter low confidence results
+                            page_text += text + " "
+                    
+                    extracted_text += f"\n--- Page {i+1} ---\n{page_text.strip()}\n"
+                    print(f"Page {i+1} EasyOCR completed, extracted {len(page_text)} characters")
+                
+                # If EasyOCR didn't extract much text, try Tesseract as fallback
+                if len(extracted_text.strip()) < 100:
+                    print("EasyOCR extracted little text, trying Tesseract fallback...")
+                    return self._extract_with_tesseract(images)
+                
+                print(f"EasyOCR completed, total extracted text length: {len(extracted_text)}")
+                return extracted_text.strip()
+                
+            except ImportError:
+                print("EasyOCR not available, falling back to Tesseract...")
+                return self._extract_with_tesseract(images)
+            except Exception as e:
+                print(f"EasyOCR failed: {str(e)}, falling back to Tesseract...")
+                return self._extract_with_tesseract(images)
             
         except ImportError as e:
             print(f"Import error in OCR: {str(e)}")
             raise HTTPException(
                 status_code=500,
-                detail="OCR dependencies not installed. Please install tesseract-ocr and pdf2image."
+                detail="OCR dependencies not installed. Please install easyocr, pytesseract and pdf2image."
             )
         except Exception as e:
             print(f"OCR extraction failed: {str(e)}")
@@ -93,6 +128,97 @@ class AIProcessor:
             raise HTTPException(
                 status_code=500,
                 detail=f"OCR extraction failed: {str(e)}"
+            )
+    
+    def _extract_with_tesseract(self, images) -> str:
+        """Extract text using Tesseract OCR (fallback method)."""
+        try:
+            import pytesseract
+            
+            extracted_text = ""
+            
+            # Process each page with Tesseract
+            for i, image in enumerate(images):
+                print(f"Processing page {i+1} with Tesseract...")
+                # Use Tesseract to extract text from the image
+                page_text = pytesseract.image_to_string(image, lang='eng')
+                extracted_text += f"\n--- Page {i+1} ---\n{page_text}\n"
+                print(f"Page {i+1} Tesseract completed, extracted {len(page_text)} characters")
+            
+            print(f"Tesseract completed, total extracted text length: {len(extracted_text)}")
+            return extracted_text.strip()
+            
+        except Exception as e:
+            print(f"Tesseract extraction failed: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Tesseract OCR extraction failed: {str(e)}"
+            )
+    
+    def _extract_with_easyocr(self, pdf_path: str) -> str:
+        """Extract text using EasyOCR only."""
+        try:
+            import easyocr
+            from pdf2image import convert_from_path
+            import numpy as np
+            
+            print(f"Starting EasyOCR extraction for: {pdf_path}")
+            
+            # Convert PDF to images
+            images = convert_from_path(pdf_path, dpi=300)
+            print(f"Converted {len(images)} pages to images")
+            
+            # Initialize EasyOCR reader
+            reader = easyocr.Reader(['en'])
+            
+            extracted_text = ""
+            
+            # Process each page
+            for i, image in enumerate(images):
+                print(f"Processing page {i+1} with EasyOCR...")
+                # Convert PIL image to numpy array for EasyOCR
+                img_array = np.array(image)
+                
+                # Extract text with EasyOCR
+                results = reader.readtext(img_array)
+                page_text = ""
+                
+                for (bbox, text, confidence) in results:
+                    if confidence > 0.3:  # Filter low confidence results
+                        page_text += text + " "
+                
+                extracted_text += f"\n--- Page {i+1} ---\n{page_text.strip()}\n"
+                print(f"Page {i+1} EasyOCR completed, extracted {len(page_text)} characters")
+            
+            print(f"EasyOCR completed, total extracted text length: {len(extracted_text)}")
+            return extracted_text.strip()
+            
+        except Exception as e:
+            print(f"EasyOCR extraction failed: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"EasyOCR extraction failed: {str(e)}"
+            )
+    
+    def _extract_with_tesseract_from_path(self, pdf_path: str) -> str:
+        """Extract text using Tesseract OCR only."""
+        try:
+            import pytesseract
+            from pdf2image import convert_from_path
+            
+            print(f"Starting Tesseract extraction for: {pdf_path}")
+            
+            # Convert PDF to images
+            images = convert_from_path(pdf_path, dpi=300)
+            print(f"Converted {len(images)} pages to images")
+            
+            return self._extract_with_tesseract(images)
+            
+        except Exception as e:
+            print(f"Tesseract extraction failed: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Tesseract extraction failed: {str(e)}"
             )
     
     def process_with_openai(self, text: str) -> Dict[str, Any]:
@@ -236,6 +362,10 @@ class AIProcessor:
         try:
             print(f"Starting PDF processing for: {pdf_path}")
             
+            # Check if multimodal LLM is requested
+            if self.provider == "multimodal":
+                return self.process_with_multimodal_llm(pdf_path)
+            
             # Extract text from PDF (with OCR if needed)
             text = self.extract_text_from_pdf(pdf_path, use_ocr)
             
@@ -267,4 +397,159 @@ class AIProcessor:
             raise HTTPException(
                 status_code=500,
                 detail=f"PDF processing failed: {str(e)}"
-            ) 
+            )
+    
+    def process_with_multimodal_llm(self, pdf_path: str) -> Dict[str, Any]:
+        """Process PDF using multimodal LLM (Ollama + LLaVA) by sending images directly."""
+        try:
+            import requests
+            import base64
+            from pdf2image import convert_from_path
+            from PIL import Image
+            import io
+            
+            print(f"Starting multimodal LLM processing for: {pdf_path}")
+            
+            # Convert PDF to images
+            print("Converting PDF to images...")
+            images = convert_from_path(pdf_path, dpi=300)
+            print(f"Converted {len(images)} pages to images")
+            
+            # Process each page with LLaVA
+            all_results = []
+            
+            for i, image in enumerate(images):
+                print(f"Processing page {i+1} with LLaVA...")
+                
+                # Convert PIL image to base64
+                img_buffer = io.BytesIO()
+                image.save(img_buffer, format='PNG')
+                img_str = base64.b64encode(img_buffer.getvalue()).decode()
+                
+                # Prepare the prompt for handwritten note analysis
+                prompt = f"""
+                Analyze this handwritten note image and extract the following information:
+                
+                1. **Summary**: Provide a concise 2-3 sentence summary of the main content
+                2. **Tasks/Action Items**: List any tasks, to-dos, or action items mentioned
+                3. **Key Topics**: Identify the main topics or themes discussed
+                4. **Important Dates**: Extract any dates, deadlines, or time references
+                5. **Additional Notes**: Any other important information or insights
+                
+                Please respond in a structured format that can be easily parsed.
+                Focus on extracting actionable information and key insights from the handwritten content.
+                """
+                
+                # Call Ollama LLaVA API
+                try:
+                    response = requests.post(
+                        'http://localhost:11434/api/generate',
+                        json={
+                            'model': 'llava',
+                            'prompt': prompt,
+                            'images': [img_str],
+                            'stream': False
+                        },
+                        timeout=120  # 2 minute timeout
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        page_text = result.get('response', '')
+                        print(f"Page {i+1} LLaVA completed, extracted {len(page_text)} characters")
+                        
+                        all_results.append({
+                            'page': i + 1,
+                            'text': page_text,
+                            'length': len(page_text)
+                        })
+                    else:
+                        print(f"LLaVA API error for page {i+1}: {response.status_code}")
+                        all_results.append({
+                            'page': i + 1,
+                            'text': f"Error: API returned status {response.status_code}",
+                            'length': 0
+                        })
+                        
+                except requests.exceptions.RequestException as e:
+                    print(f"Request error for page {i+1}: {str(e)}")
+                    all_results.append({
+                        'page': i + 1,
+                        'text': f"Error: {str(e)}",
+                        'length': 0
+                    })
+            
+            # Aggregate results
+            total_text = "\n\n--- Page Separator ---\n\n".join([r['text'] for r in all_results])
+            total_length = sum([r['length'] for r in all_results])
+            
+            print(f"Multimodal LLM completed, total extracted text length: {total_length}")
+            
+            # Parse the aggregated response to extract structured information
+            parsed_result = self._parse_multimodal_response(total_text)
+            
+            return {
+                "summary": parsed_result.get("summary", "No summary available"),
+                "tasks": parsed_result.get("tasks", []),
+                "topics": parsed_result.get("topics", []),
+                "dates": parsed_result.get("dates", []),
+                "confidence": 0.9,  # High confidence for multimodal approach
+                "method": "multimodal_llava",
+                "raw_text": total_text,
+                "pages_processed": len(all_results),
+                "total_length": total_length
+            }
+            
+        except Exception as e:
+            print(f"Multimodal LLM processing failed: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Multimodal LLM processing failed: {str(e)}"
+            )
+    
+    def _parse_multimodal_response(self, text: str) -> Dict[str, Any]:
+        """Parse the multimodal LLM response to extract structured information."""
+        try:
+            # Simple parsing logic - can be enhanced with more sophisticated parsing
+            text_lower = text.lower()
+            
+            # Extract potential tasks (lines with action words)
+            action_words = ['todo', 'task', 'action', 'need to', 'must', 'should', 'will', 'going to', 'do', 'complete']
+            lines = text.split('\n')
+            tasks = []
+            for line in lines:
+                if any(word in line.lower() for word in action_words):
+                    tasks.append(line.strip())
+            
+            # Extract potential dates
+            import re
+            date_pattern = r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b|\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+\d{4}\b'
+            dates = re.findall(date_pattern, text, re.IGNORECASE)
+            
+            # Extract summary (first few sentences)
+            sentences = text.split('.')
+            summary = '. '.join(sentences[:3]) + '.'
+            
+            # Extract topics (look for common topic indicators)
+            topic_indicators = ['topic', 'subject', 'theme', 'about', 'regarding', 'concerning']
+            topics = []
+            for line in lines:
+                if any(indicator in line.lower() for indicator in topic_indicators):
+                    topics.append(line.strip())
+            
+            return {
+                "summary": summary,
+                "tasks": tasks[:10],  # Limit to 10 tasks
+                "topics": topics[:5],  # Limit to 5 topics
+                "dates": dates,
+            }
+            
+        except Exception as e:
+            print(f"Error parsing multimodal response: {str(e)}")
+            return {
+                "summary": text[:200] + "..." if len(text) > 200 else text,
+                "tasks": [],
+                "topics": [],
+                "dates": []
+            } 

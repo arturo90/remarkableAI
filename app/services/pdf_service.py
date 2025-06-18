@@ -12,7 +12,7 @@ class PDFService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.storage_path = Path(self.settings.PDF_STORAGE_PATH)
+        self.storage_path = Path(self.settings.PDFS_PATH)
         self.storage_path.mkdir(parents=True, exist_ok=True)
     
     def store_pdf(self, pdf_data: bytes, filename: str, metadata: Dict[str, Any]) -> str:

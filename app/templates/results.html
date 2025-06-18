@@ -1,156 +1,158 @@
 {% extends "base.html" %}
 
-{% block title %}AI Results - RemarkableAI{% endblock %}
+{% block title %}Tasks & Insights - RemarkableAI{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <!-- Header -->
-    <div class="mb-8">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900">AI Analysis Results</h1>
-                <p class="text-gray-600 mt-2">View insights extracted from your documents</p>
-            </div>
-            <div class="flex space-x-3">
-                <button onclick="refreshResults()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                    <i class="fas fa-refresh mr-2"></i>Refresh
-                </button>
-                <button onclick="exportResults()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
-                    <i class="fas fa-download mr-2"></i>Export
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Stats Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                    <i class="fas fa-file-alt text-xl"></i>
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold text-gray-900 mb-2">Tasks & Insights</h1>
+                    <p class="text-gray-600">Stay organized with actionable tasks extracted from your notes</p>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Documents Analyzed</p>
-                    <p id="total-documents" class="text-2xl font-bold text-gray-900">-</p>
+                <div class="flex space-x-3">
+                    <button onclick="refreshResults()" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                        <i class="fas fa-refresh mr-2"></i>Refresh
+                    </button>
+                    <a href="/" class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors font-semibold">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
                 </div>
             </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-green-100 text-green-600">
-                    <i class="fas fa-tasks text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Total Tasks</p>
-                    <p id="total-tasks" class="text-2xl font-bold text-gray-900">-</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
-                    <i class="fas fa-calendar text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Dates Found</p>
-                    <p id="total-dates" class="text-2xl font-bold text-gray-900">-</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                    <i class="fas fa-tags text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Topics</p>
-                    <p id="total-topics" class="text-2xl font-bold text-gray-900">-</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div class="flex space-x-4">
-                <select id="document-filter" class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="all">All Documents</option>
-                </select>
-                <select id="task-filter" class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="all">All Tasks</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending">Pending</option>
-                </select>
-            </div>
-            <div class="relative">
-                <input type="text" id="search-input" placeholder="Search results..." 
-                       class="border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-64">
-                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-            </div>
-        </div>
-    </div>
-
-    <!-- Content Tabs -->
-    <div class="bg-white rounded-lg shadow-md">
-        <div class="border-b border-gray-200">
-            <nav class="flex space-x-8 px-6" aria-label="Tabs">
-                <button onclick="showTab('tasks')" id="tab-tasks" class="tab-button active py-4 px-1 border-b-2 border-blue-500 text-sm font-medium text-blue-600">
-                    <i class="fas fa-tasks mr-2"></i>Tasks
-                </button>
-                <button onclick="showTab('summaries')" id="tab-summaries" class="tab-button py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-file-alt mr-2"></i>Summaries
-                </button>
-                <button onclick="showTab('dates')" id="tab-dates" class="tab-button py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-calendar mr-2"></i>Dates
-                </button>
-                <button onclick="showTab('topics')" id="tab-topics" class="tab-button py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-tags mr-2"></i>Topics
-                </button>
-            </nav>
         </div>
 
-        <!-- Tab Content -->
-        <div class="p-6">
-            <!-- Tasks Tab -->
-            <div id="tab-content-tasks" class="tab-content active">
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Extracted Tasks</h3>
-                    <div id="tasks-list" class="space-y-4">
-                        <!-- Tasks will be loaded here -->
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-blue-100 rounded-lg mr-4">
+                        <i class="fas fa-file-alt text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Notes Analyzed</p>
+                        <div id="total-documents" class="text-2xl font-bold text-gray-900">-</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Summaries Tab -->
-            <div id="tab-content-summaries" class="tab-content hidden">
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Document Summaries</h3>
-                    <div id="summaries-list" class="space-y-6">
-                        <!-- Summaries will be loaded here -->
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-100 rounded-lg mr-4">
+                        <i class="fas fa-tasks text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Total Tasks</p>
+                        <div id="total-tasks" class="text-2xl font-bold text-gray-900">-</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Dates Tab -->
-            <div id="tab-content-dates" class="tab-content hidden">
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Important Dates</h3>
-                    <div id="dates-list" class="space-y-4">
-                        <!-- Dates will be loaded here -->
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-purple-100 rounded-lg mr-4">
+                        <i class="fas fa-calendar text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Dates Found</p>
+                        <div id="total-dates" class="text-2xl font-bold text-gray-900">-</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Topics Tab -->
-            <div id="tab-content-topics" class="tab-content hidden">
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Key Topics</h3>
-                    <div id="topics-list" class="space-y-4">
-                        <!-- Topics will be loaded here -->
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-orange-100 rounded-lg mr-4">
+                        <i class="fas fa-tags text-orange-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Topics</p>
+                        <div id="total-topics" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <div class="flex space-x-4">
+                    <select id="document-filter" class="border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Notes</option>
+                    </select>
+                    <select id="task-filter" class="border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Tasks</option>
+                        <option value="completed">Completed</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </div>
+                <div class="relative">
+                    <input type="text" id="search-input" placeholder="Search tasks and insights..." 
+                           class="border border-gray-300 rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Tabs -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100">
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-8 px-6" aria-label="Tabs">
+                    <button onclick="showTab('tasks')" id="tab-tasks" class="tab-button active py-4 px-1 border-b-2 border-blue-500 text-sm font-medium text-blue-600">
+                        <i class="fas fa-tasks mr-2"></i>Tasks
+                    </button>
+                    <button onclick="showTab('summaries')" id="tab-summaries" class="tab-button py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-file-alt mr-2"></i>Summaries
+                    </button>
+                    <button onclick="showTab('topics')" id="tab-topics" class="tab-button py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-tags mr-2"></i>Topics
+                    </button>
+                    <button onclick="showTab('dates')" id="tab-dates" class="tab-button py-4 px-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-calendar mr-2"></i>Dates
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="p-6">
+                <!-- Tasks Tab -->
+                <div id="tab-content-tasks" class="tab-content active">
+                    <div class="mb-6">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">Your Tasks</h3>
+                        <div id="tasks-list" class="space-y-4">
+                            <!-- Tasks will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summaries Tab -->
+                <div id="tab-content-summaries" class="tab-content hidden">
+                    <div class="mb-6">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">Note Summaries</h3>
+                        <div id="summaries-list" class="space-y-6">
+                            <!-- Summaries will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Topics Tab -->
+                <div id="tab-content-topics" class="tab-content hidden">
+                    <div class="mb-6">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">Key Topics</h3>
+                        <div id="topics-list" class="space-y-4">
+                            <!-- Topics will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dates Tab -->
+                <div id="tab-content-dates" class="tab-content hidden">
+                    <div class="mb-6">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">Important Dates</h3>
+                        <div id="dates-list" class="space-y-4">
+                            <!-- Dates will be loaded here -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -165,23 +167,82 @@ let currentTab = 'tasks';
 // Load results data
 async function loadResults() {
     try {
-        // For now, we'll load from the results directory
-        // TODO: Create proper API endpoint for results
-        const response = await fetch('/api/results/list');
+        console.log('Loading results...');
+        
+        // Check if required DOM elements exist
+        const requiredElements = [
+            'total-documents', 'total-tasks', 'total-dates', 'total-topics',
+            'document-filter', 'task-filter', 'search-input',
+            'tasks-list', 'summaries-list', 'topics-list', 'dates-list'
+        ];
+        
+        const missingElements = requiredElements.filter(id => !document.getElementById(id));
+        if (missingElements.length > 0) {
+            throw new Error('Missing DOM elements: ' + missingElements.join(', '));
+        }
+        
+        // Load from the correct API endpoint
+        const response = await fetch('/gmail/api/results/list');
+        console.log('API response status:', response.status);
+        
         if (response.ok) {
-            allResults = await response.json();
+            const data = await response.json();
+            console.log('API data received:', data);
+            allResults = data.results || data; // Handle both structures
+            console.log('All results count:', allResults.length);
+            
+            // Get PDF metadata to match with results
+            try {
+                const pdfsResponse = await fetch('/gmail/local/list-pdfs');
+                console.log('PDFs response status:', pdfsResponse.status);
+                
+                if (pdfsResponse.ok) {
+                    const pdfs = await pdfsResponse.json();
+                    console.log('PDFs count:', pdfs.length);
+                    const pdfMap = new Map();
+                    
+                    // Create a map of message_id + attachment_id to PDF metadata
+                    pdfs.forEach(pdf => {
+                        const key = `${pdf.metadata.message_id}_${pdf.metadata.attachment_id}`;
+                        pdfMap.set(key, pdf);
+                    });
+                    
+                    // Add filename and metadata to results
+                    allResults = allResults.map(result => {
+                        const key = `${result.message_id}_${result.attachment_id}`;
+                        const pdf = pdfMap.get(key);
+                        return {
+                            ...result,
+                            filename: pdf ? pdf.filename : `Note ${result.attachment_hash}`,
+                            metadata: pdf ? pdf.metadata : { subject: 'Unknown Note' }
+                        };
+                    });
+                    
+                    console.log('Results with metadata:', allResults.length);
+                }
+            } catch (error) {
+                console.log('Could not load PDF metadata, using fallback names:', error);
+                // Add fallback names if PDF metadata is not available
+                allResults = allResults.map(result => ({
+                    ...result,
+                    filename: `Note ${result.attachment_hash}`,
+                    metadata: { subject: 'Unknown Note' }
+                }));
+            }
         } else {
+            console.error('API response not ok:', response.status, response.statusText);
             // Fallback: try to load from local storage results
             allResults = await loadResultsFromStorage();
         }
         
+        console.log('Final results count:', allResults.length);
         updateStats();
         updateFilters();
         showCurrentTab();
         
     } catch (error) {
         console.error('Error loading results:', error);
-        showNotification('Error loading results', 'error');
+        showNotification('Error loading results: ' + error.message, 'error');
     }
 }
 
@@ -195,7 +256,7 @@ async function loadResultsFromStorage() {
         for (const pdf of pdfs) {
             // Try to load corresponding result file
             try {
-                const resultResponse = await fetch(`/api/results/${pdf.metadata.message_id}/${pdf.metadata.attachment_id}`);
+                const resultResponse = await fetch(`/gmail/api/results/${pdf.metadata.message_id}/${pdf.metadata.attachment_id}`);
                 if (resultResponse.ok) {
                     const result = await resultResponse.json();
                     results.push({
@@ -206,6 +267,7 @@ async function loadResultsFromStorage() {
                 }
             } catch (error) {
                 // Skip if no result file exists
+                console.log(`No result found for ${pdf.filename}`);
             }
         }
         
@@ -234,7 +296,7 @@ function updateFilters() {
     const documentFilter = document.getElementById('document-filter');
     const uniqueDocuments = [...new Set(allResults.map(r => r.filename || r.metadata?.subject || 'Unknown'))];
     
-    documentFilter.innerHTML = '<option value="all">All Documents</option>';
+    documentFilter.innerHTML = '<option value="all">All Notes</option>';
     uniqueDocuments.forEach(doc => {
         documentFilter.innerHTML += `<option value="${doc}">${doc}</option>`;
     });
@@ -290,11 +352,11 @@ function showCurrentTab() {
         case 'summaries':
             showSummaries(filteredResults);
             break;
-        case 'dates':
-            showDates(filteredResults);
-            break;
         case 'topics':
             showTopics(filteredResults);
+            break;
+        case 'dates':
+            showDates(filteredResults);
             break;
     }
 }
@@ -307,37 +369,43 @@ function showTasks(results, taskFilter) {
     results.forEach(result => {
         if (result.result.tasks) {
             result.result.tasks.forEach(task => {
-                allTasks.push({
-                    task,
-                    document: result.filename || result.metadata?.subject || 'Unknown',
-                    date: result.processed_at || 'Unknown',
-                    confidence: result.result.confidence || 0.8
-                });
+                // Filter out summary text and only show actual tasks
+                if (task.trim() && !task.includes('**Summary**') && !task.includes('**Tasks/Action Items**')) {
+                    allTasks.push({
+                        task: task.trim(),
+                        document: result.filename || result.metadata?.subject || 'Unknown',
+                        date: result.processed_at || 'Unknown',
+                        confidence: result.result.confidence || 0.8
+                    });
+                }
             });
         }
     });
     
     if (allTasks.length === 0) {
         tasksList.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-tasks text-4xl text-gray-300 mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-                <p class="text-gray-500">Process some PDFs to extract tasks.</p>
+            <div class="text-center py-12">
+                <i class="fas fa-tasks text-6xl text-gray-300 mb-6"></i>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No tasks found</h3>
+                <p class="text-gray-500 mb-6">Process some notes to extract tasks and action items</p>
+                <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                    <i class="fas fa-magic mr-2"></i>Process Notes
+                </a>
             </div>
         `;
         return;
     }
     
     tasksList.innerHTML = allTasks.map(task => `
-        <div class="flex items-start space-x-4 p-4 border rounded-lg hover:bg-gray-50">
+        <div class="flex items-start space-x-4 p-6 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
             <div class="flex-shrink-0">
-                <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <input type="checkbox" class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
             </div>
             <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900">${task.task}</p>
-                <div class="flex items-center space-x-4 mt-1">
-                    <span class="text-xs text-gray-500">From: ${task.document}</span>
-                    <span class="text-xs text-gray-500">${task.date}</span>
+                <p class="text-lg font-medium text-gray-900 mb-2">${task.task}</p>
+                <div class="flex items-center space-x-4 text-sm text-gray-500">
+                    <span><i class="fas fa-file-alt mr-1"></i>${task.document}</span>
+                    <span><i class="fas fa-calendar mr-1"></i>${new Date(task.date).toLocaleDateString()}</span>
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         ${Math.round(task.confidence * 100)}% confidence
                     </span>
@@ -353,28 +421,75 @@ function showSummaries(results) {
     
     if (results.length === 0) {
         summariesList.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-file-alt text-4xl text-gray-300 mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">No summaries found</h3>
-                <p class="text-gray-500">Process some PDFs to generate summaries.</p>
+            <div class="text-center py-12">
+                <i class="fas fa-file-alt text-6xl text-gray-300 mb-6"></i>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No summaries found</h3>
+                <p class="text-gray-500 mb-6">Process some notes to generate summaries</p>
+                <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                    <i class="fas fa-magic mr-2"></i>Process Notes
+                </a>
             </div>
         `;
         return;
     }
     
     summariesList.innerHTML = results.map(result => `
-        <div class="border rounded-lg p-6">
+        <div class="bg-gray-50 rounded-xl p-6 border border-gray-100">
             <div class="flex items-center justify-between mb-4">
-                <h4 class="text-lg font-medium text-gray-900">${result.filename || result.metadata?.subject || 'Unknown Document'}</h4>
-                <span class="text-sm text-gray-500">${result.processed_at || 'Unknown date'}</span>
+                <h4 class="text-xl font-semibold text-gray-900">${result.filename || result.metadata?.subject || 'Unknown Note'}</h4>
+                <span class="text-sm text-gray-500">${new Date(result.processed_at || 'Unknown').toLocaleDateString()}</span>
             </div>
-            <p class="text-gray-700 leading-relaxed">${result.result.summary || 'No summary available'}</p>
-            <div class="mt-4 flex items-center space-x-4">
+            <p class="text-gray-700 leading-relaxed mb-4">${result.result.summary || 'No summary available'}</p>
+            <div class="flex items-center space-x-4">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     ${Math.round((result.result.confidence || 0.8) * 100)}% confidence
                 </span>
                 <span class="text-xs text-gray-500">Method: ${result.result.method || 'AI Analysis'}</span>
             </div>
+        </div>
+    `).join('');
+}
+
+// Show topics
+function showTopics(results) {
+    const topicsList = document.getElementById('topics-list');
+    const allTopics = [];
+    
+    results.forEach(result => {
+        if (result.result.topics) {
+            result.result.topics.forEach(topic => {
+                if (topic.trim() && !topic.includes('**Summary**') && !topic.includes('**Key Topics**')) {
+                    allTopics.push({
+                        topic: topic.trim(),
+                        document: result.filename || result.metadata?.subject || 'Unknown',
+                        date: result.processed_at || 'Unknown'
+                    });
+                }
+            });
+        }
+    });
+    
+    if (allTopics.length === 0) {
+        topicsList.innerHTML = `
+            <div class="text-center py-12">
+                <i class="fas fa-tags text-6xl text-gray-300 mb-6"></i>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No topics found</h3>
+                <p class="text-gray-500 mb-6">Process some notes to extract key topics</p>
+                <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                    <i class="fas fa-magic mr-2"></i>Process Notes
+                </a>
+            </div>
+        `;
+        return;
+    }
+    
+    topicsList.innerHTML = allTopics.map(topic => `
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+            <div class="flex-1">
+                <p class="text-lg font-medium text-gray-900">${topic.topic}</p>
+                <p class="text-sm text-gray-500">From: ${topic.document}</p>
+            </div>
+            <span class="text-sm text-gray-500">${new Date(topic.date).toLocaleDateString()}</span>
         </div>
     `).join('');
 }
@@ -398,80 +513,25 @@ function showDates(results) {
     
     if (allDates.length === 0) {
         datesList.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-calendar text-4xl text-gray-300 mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">No dates found</h3>
-                <p class="text-gray-500">Process some PDFs to extract dates.</p>
+            <div class="text-center py-12">
+                <i class="fas fa-calendar text-6xl text-gray-300 mb-6"></i>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No dates found</h3>
+                <p class="text-gray-500 mb-6">Process some notes to extract important dates</p>
+                <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                    <i class="fas fa-magic mr-2"></i>Process Notes
+                </a>
             </div>
         `;
         return;
     }
     
     datesList.innerHTML = allDates.map(dateItem => `
-        <div class="flex items-center space-x-4 p-4 border rounded-lg">
-            <div class="flex-shrink-0">
-                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-calendar text-blue-600"></i>
-                </div>
-            </div>
-            <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900">${dateItem.date}</p>
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+            <div class="flex-1">
+                <p class="text-lg font-medium text-gray-900">${dateItem.date}</p>
                 <p class="text-sm text-gray-500">From: ${dateItem.document}</p>
-                <p class="text-xs text-gray-400 mt-1 truncate">${dateItem.context}</p>
             </div>
-        </div>
-    `).join('');
-}
-
-// Show topics
-function showTopics(results) {
-    const topicsList = document.getElementById('topics-list');
-    const allTopics = [];
-    
-    results.forEach(result => {
-        if (result.result.topics) {
-            result.result.topics.forEach(topic => {
-                allTopics.push({
-                    topic,
-                    document: result.filename || result.metadata?.subject || 'Unknown',
-                    frequency: 1 // TODO: Calculate actual frequency
-                });
-            });
-        }
-    });
-    
-    if (allTopics.length === 0) {
-        topicsList.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-tags text-4xl text-gray-300 mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">No topics found</h3>
-                <p class="text-gray-500">Process some PDFs to extract topics.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Group topics by frequency
-    const topicCounts = {};
-    allTopics.forEach(item => {
-        topicCounts[item.topic] = (topicCounts[item.topic] || 0) + 1;
-    });
-    
-    const sortedTopics = Object.entries(topicCounts)
-        .sort(([,a], [,b]) => b - a)
-        .map(([topic, count]) => ({ topic, count }));
-    
-    topicsList.innerHTML = sortedTopics.map(topicItem => `
-        <div class="flex items-center justify-between p-4 border rounded-lg">
-            <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-tag text-purple-600 text-sm"></i>
-                </div>
-                <span class="text-sm font-medium text-gray-900">${topicItem.topic}</span>
-            </div>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                ${topicItem.count} occurrence${topicItem.count > 1 ? 's' : ''}
-            </span>
+            <span class="text-sm text-gray-500">Important Date</span>
         </div>
     `).join('');
 }
@@ -496,27 +556,12 @@ async function refreshResults() {
     }
 }
 
-// Export results
-function exportResults() {
-    const dataStr = JSON.stringify(allResults, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `remarkable-ai-results-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    
-    showNotification('Results exported successfully', 'success');
-}
-
 // Show notification
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
         type === 'success' ? 'bg-green-500 text-white' :
         type === 'error' ? 'bg-red-500 text-white' :
-        type === 'warning' ? 'bg-yellow-500 text-white' :
         'bg-blue-500 text-white'
     }`;
     notification.textContent = message;
@@ -530,6 +575,18 @@ function showNotification(message, type = 'info') {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
+    // Add global error handler
+    window.addEventListener('error', function(e) {
+        console.error('Global error:', e.error);
+        showNotification('JavaScript error: ' + e.error.message, 'error');
+    });
+    
+    // Add unhandled promise rejection handler
+    window.addEventListener('unhandledrejection', function(e) {
+        console.error('Unhandled promise rejection:', e.reason);
+        showNotification('Promise error: ' + e.reason, 'error');
+    });
+    
     loadResults();
     
     // Filter and search event listeners
@@ -538,14 +595,4 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('search-input').addEventListener('input', showCurrentTab);
 });
 </script>
-
-<style>
-.tab-button.active {
-    @apply border-blue-500 text-blue-600;
-}
-
-.tab-content.active {
-    @apply block;
-}
-</style>
 {% endblock %} 

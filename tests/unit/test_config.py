@@ -4,29 +4,16 @@ import os
 
 def test_settings_default_values():
     """Test that settings have correct default values."""
-    settings = Settings(
-        GMAIL_CLIENT_ID="test",
-        GMAIL_CLIENT_SECRET="test",
-        GMAIL_REDIRECT_URI="test",
-        OPENAI_API_KEY="test",
-        DATABASE_URL="test",
-        SECRET_KEY="test",
-        EMAIL_FROM="test",
-        EMAIL_TO="test"
-    )
+    settings = Settings()
     
     assert settings.ENVIRONMENT == "development"
     assert settings.DEBUG is True
     assert settings.LOG_LEVEL == "INFO"
     assert settings.ALGORITHM == "HS256"
     assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 30
-    assert settings.PDF_STORAGE_PATH == "./storage/pdfs"
-    assert settings.TEMP_STORAGE_PATH == "./storage/temp"
-
-def test_settings_required_fields():
-    """Test that required fields are enforced."""
-    with pytest.raises(ValueError):
-        Settings()
+    assert settings.PDFS_PATH == "storage/pdfs"
+    assert settings.STORAGE_PATH == "storage"
+    assert settings.RESULTS_PATH == "storage/results"
 
 def test_get_settings_caching():
     """Test that get_settings returns cached instance."""

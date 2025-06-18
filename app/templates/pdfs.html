@@ -1,112 +1,151 @@
 {% extends "base.html" %}
 
-{% block title %}PDF Management - RemarkableAI{% endblock %}
+{% block title %}Notes - RemarkableAI{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <!-- Header -->
-    <div class="mb-8">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900">PDF Management</h1>
-                <p class="text-gray-600 mt-2">Manage your PDF documents from Gmail</p>
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold text-gray-900 mb-2">Your Notes</h1>
+                    <p class="text-gray-600">Browse your handwritten notes and verify AI extraction accuracy</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="refreshNotes()" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                        <i class="fas fa-refresh mr-2"></i>Refresh
+                    </button>
+                    <a href="/" class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors font-semibold">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
+                </div>
             </div>
-            <div class="flex space-x-3">
-                <button onclick="syncPdfs()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                    <i class="fas fa-sync-alt mr-2"></i>Sync from Gmail
-                </button>
-                <button onclick="processAllPdfs()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
-                    <i class="fas fa-magic mr-2"></i>Process All
-                </button>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-blue-100 rounded-lg mr-4">
+                        <i class="fas fa-file-pdf text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Total Notes</p>
+                        <div id="total-notes" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-100 rounded-lg mr-4">
+                        <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Processed</p>
+                        <div id="processed-notes" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-purple-100 rounded-lg mr-4">
+                        <i class="fas fa-tasks text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Tasks Found</p>
+                        <div id="total-tasks" class="text-2xl font-bold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div class="flex items-center">
+                    <div class="p-3 bg-orange-100 rounded-lg mr-4">
+                        <i class="fas fa-clock text-orange-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Latest Note</p>
+                        <div id="latest-note" class="text-lg font-semibold text-gray-900">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters and Search -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <div class="flex space-x-4">
+                    <select id="status-filter" class="border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Notes</option>
+                        <option value="processed">Processed</option>
+                        <option value="unprocessed">Not Processed</option>
+                    </select>
+                    <select id="date-filter" class="border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+                <div class="relative">
+                    <input type="text" id="search-input" placeholder="Search notes..." 
+                           class="border border-gray-300 rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full md:w-64">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes Grid -->
+        <div id="notes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Notes will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-12">
+            <div class="max-w-md mx-auto">
+                <i class="fas fa-file-pdf text-6xl text-gray-300 mb-6"></i>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">No notes found</h3>
+                <p class="text-gray-600 mb-6">Sync your notes from Gmail to get started</p>
+                <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                    <i class="fas fa-sync-alt mr-2"></i>Sync Notes
+                </a>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                    <i class="fas fa-file-pdf text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Total PDFs</p>
-                    <p id="total-pdfs" class="text-2xl font-bold text-gray-900">-</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-green-100 text-green-600">
-                    <i class="fas fa-check-circle text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Processed</p>
-                    <p id="processed-pdfs" class="text-2xl font-bold text-gray-900">-</p>
+<!-- Note Detail Modal -->
+<div id="note-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-screen overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-900" id="modal-title">Note Details</h2>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
                 </div>
             </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                    <i class="fas fa-clock text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Pending</p>
-                    <p id="pending-pdfs" class="text-2xl font-bold text-gray-900">-</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
-                    <i class="fas fa-tasks text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-600">Tasks Found</p>
-                    <p id="total-tasks" class="text-2xl font-bold text-gray-900">-</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters and Search -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div class="flex space-x-4">
-                <select id="status-filter" class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="all">All Status</option>
-                    <option value="processed">Processed</option>
-                    <option value="pending">Pending</option>
-                </select>
-                <select id="sort-by" class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="date">Sort by Date</option>
-                    <option value="name">Sort by Name</option>
-                    <option value="size">Sort by Size</option>
-                </select>
-            </div>
-            <div class="relative">
-                <input type="text" id="search-input" placeholder="Search PDFs..." 
-                       class="border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-64">
-                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-            </div>
-        </div>
-    </div>
-
-    <!-- PDF List -->
-    <div class="bg-white rounded-lg shadow-md">
-        <div class="p-6 border-b border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-900">PDF Documents</h2>
-        </div>
-        <div id="pdf-list" class="divide-y divide-gray-200">
-            <!-- Loading state -->
             <div class="p-6">
-                <div class="animate-pulse space-y-4">
-                    <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Original Image -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Original Note</h3>
+                        <div class="bg-gray-100 rounded-lg p-4">
+                            <img id="modal-image" src="" alt="Original note" class="w-full rounded-lg shadow-md">
+                        </div>
+                    </div>
+                    
+                    <!-- AI Analysis -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">AI Analysis</h3>
+                        <div id="modal-analysis" class="space-y-4">
+                            <!-- Analysis content will be loaded here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -114,172 +153,117 @@
 </div>
 
 <script>
-let allPdfs = [];
-let filteredPdfs = [];
+let allNotes = [];
+let processedNotes = [];
 
-// Load PDF data
-async function loadPdfData() {
+// Load notes data
+async function loadNotes() {
     try {
         const response = await fetch('/gmail/local/list-pdfs');
-        const data = await response.json();
-        
-        allPdfs = data.pdfs.map(pdf => ({
-            ...pdf,
-            filename: pdf.pdf.split('/').pop(),
-            status: 'pending', // We'll determine this based on results
-            processed: false
-        }));
-        
-        // Check which PDFs have been processed
-        await checkProcessedStatus();
-        
-        updateStats();
-        filterAndDisplayPdfs();
-        
-    } catch (error) {
-        console.error('Error loading PDF data:', error);
-        showNotification('Error loading PDFs', 'error');
-    }
-}
-
-// Check which PDFs have been processed
-async function checkProcessedStatus() {
-    try {
-        const resultsDir = 'storage/results';
-        const response = await fetch('/api/results/list');
         if (response.ok) {
-            const results = await response.json();
-            const processedIds = new Set();
-            
-            results.forEach(result => {
-                const key = `${result.message_id}_${result.attachment_hash}`;
-                processedIds.add(key);
-            });
-            
-            allPdfs.forEach(pdf => {
-                const key = `${pdf.metadata.message_id}_${pdf.metadata.attachment_id}`;
-                pdf.processed = processedIds.has(key);
-                pdf.status = pdf.processed ? 'processed' : 'pending';
-            });
+            const data = await response.json();
+            allNotes = data.pdfs || []; // Extract the pdfs array from the response
+            updateStats();
+            renderNotes();
+        } else {
+            showNotification('Error loading notes', 'error');
         }
     } catch (error) {
-        console.error('Error checking processed status:', error);
+        console.error('Error loading notes:', error);
+        showNotification('Error loading notes', 'error');
     }
 }
 
 // Update statistics
-function updateStats() {
-    const total = allPdfs.length;
-    const processed = allPdfs.filter(pdf => pdf.processed).length;
-    const pending = total - processed;
-    
-    document.getElementById('total-pdfs').textContent = total;
-    document.getElementById('processed-pdfs').textContent = processed;
-    document.getElementById('pending-pdfs').textContent = pending;
-    document.getElementById('total-tasks').textContent = '-'; // TODO: Calculate from results
-}
-
-// Filter and display PDFs
-function filterAndDisplayPdfs() {
-    const statusFilter = document.getElementById('status-filter').value;
-    const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const sortBy = document.getElementById('sort-by').value;
-    
-    // Apply filters
-    filteredPdfs = allPdfs.filter(pdf => {
-        const matchesStatus = statusFilter === 'all' || pdf.status === statusFilter;
-        const matchesSearch = pdf.filename.toLowerCase().includes(searchTerm) || 
-                            (pdf.metadata.subject && pdf.metadata.subject.toLowerCase().includes(searchTerm));
-        return matchesStatus && matchesSearch;
-    });
-    
-    // Apply sorting
-    filteredPdfs.sort((a, b) => {
-        switch (sortBy) {
-            case 'name':
-                return a.filename.localeCompare(b.filename);
-            case 'size':
-                return (a.metadata.size || 0) - (b.metadata.size || 0);
-            case 'date':
-            default:
-                const dateA = a.metadata.date ? parseInt(a.metadata.date) : 0;
-                const dateB = b.metadata.date ? parseInt(b.metadata.date) : 0;
-                return dateB - dateA; // Newest first
+async function updateStats() {
+    try {
+        // Get processed notes count
+        const resultsResponse = await fetch('/gmail/api/results/list');
+        const resultsData = await resultsResponse.json();
+        const results = resultsData.results || [];
+        
+        const processedCount = results.length;
+        const totalTasks = results.reduce((sum, result) => sum + (result.result.tasks?.length || 0), 0);
+        
+        // Update stats
+        document.getElementById('total-notes').textContent = allNotes.length;
+        document.getElementById('processed-notes').textContent = processedCount;
+        document.getElementById('total-tasks').textContent = totalTasks;
+        
+        // Latest note date
+        if (allNotes.length > 0) {
+            const latestNote = allNotes[0];
+            const date = new Date(latestNote.metadata.date);
+            document.getElementById('latest-note').textContent = date.toLocaleDateString();
         }
-    });
-    
-    displayPdfs();
+        
+    } catch (error) {
+        console.error('Error updating stats:', error);
+    }
 }
 
-// Display PDFs in the list
-function displayPdfs() {
-    const pdfListElement = document.getElementById('pdf-list');
+// Render notes grid
+function renderNotes() {
+    const grid = document.getElementById('notes-grid');
+    const emptyState = document.getElementById('empty-state');
     
-    if (filteredPdfs.length === 0) {
-        pdfListElement.innerHTML = `
-            <div class="p-12 text-center">
-                <i class="fas fa-file-pdf text-4xl text-gray-300 mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-900 mb-2">No PDFs found</h3>
-                <p class="text-gray-500">Try syncing from Gmail or adjusting your filters.</p>
-            </div>
-        `;
+    if (allNotes.length === 0) {
+        grid.classList.add('hidden');
+        emptyState.classList.remove('hidden');
         return;
     }
     
-    pdfListElement.innerHTML = filteredPdfs.map(pdf => {
-        const date = pdf.metadata.date ? new Date(parseInt(pdf.metadata.date)).toLocaleDateString() : 'Unknown';
-        const size = pdf.metadata.size ? formatFileSize(pdf.metadata.size) : 'Unknown';
+    grid.classList.remove('hidden');
+    emptyState.classList.add('hidden');
+    
+    grid.innerHTML = allNotes.map(note => {
+        const date = new Date(note.metadata.date);
+        const isProcessed = checkIfProcessed(note.metadata.message_id, note.metadata.attachment_id);
         
         return `
-            <div class="p-6 hover:bg-gray-50 transition-colors">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0">
-                            <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                                <i class="fas fa-file-pdf text-red-600"></i>
-                            </div>
-                        </div>
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden">
+                <div class="p-6">
+                    <div class="flex items-start justify-between mb-4">
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-gray-900 truncate">${pdf.filename}</h3>
-                            <p class="text-sm text-gray-500">${pdf.metadata.subject || 'No subject'}</p>
-                            <div class="flex items-center space-x-4 mt-1">
-                                <span class="text-xs text-gray-400">${date}</span>
-                                <span class="text-xs text-gray-400">${size}</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    pdf.status === 'processed' 
-                                        ? 'bg-green-100 text-green-800' 
-                                        : 'bg-yellow-100 text-yellow-800'
-                                }">
-                                    ${pdf.status === 'processed' ? 'Processed' : 'Pending'}
-                                </span>
-                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 truncate">${note.filename}</h3>
+                            <p class="text-sm text-gray-500">${date.toLocaleDateString()}</p>
+                        </div>
+                        <div class="ml-4">
+                            ${isProcessed ? 
+                                '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Processed</span>' :
+                                '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Not Processed</span>'
+                            }
                         </div>
                     </div>
-                    <div class="flex items-center space-x-2">
-                        ${pdf.status === 'pending' ? `
-                            <button onclick="processPdf('${pdf.metadata.message_id}', '${pdf.metadata.attachment_id}')" 
-                                    class="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50">
+                    
+                    <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
+                        <span>${note.metadata.pages} pages</span>
+                        <span>${formatFileSize(note.metadata.size || 0)}</span>
+                    </div>
+                    
+                    <div class="flex space-x-2">
+                        <button onclick="viewNote('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
+                                class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-xl hover:bg-blue-700 transition-colors font-medium">
+                            <i class="fas fa-eye mr-2"></i>View
+                        </button>
+                        ${!isProcessed ? `
+                            <button onclick="processNote('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
+                                    class="bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700 transition-colors font-medium">
                                 <i class="fas fa-magic"></i>
                             </button>
-                        ` : `
-                            <button onclick="viewResults('${pdf.metadata.message_id}', '${pdf.metadata.attachment_id}')" 
-                                    class="text-green-600 hover:text-green-800 p-2 rounded-lg hover:bg-green-50">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        `}
-                        <a href="/pdfs/${encodeURIComponent(pdf.filename)}" 
-                           class="text-gray-600 hover:text-gray-800 p-2 rounded-lg hover:bg-gray-100">
-                            <i class="fas fa-download"></i>
-                        </a>
-                        <button onclick="deletePdf('${pdf.filename}')" 
-                                class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        ` : ''}
                     </div>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Check if note is processed
+function checkIfProcessed(messageId, attachmentId) {
+    // This would need to be implemented based on your results data
+    // For now, return false
+    return false;
 }
 
 // Format file size
@@ -291,131 +275,146 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// Sync PDFs from Gmail
-async function syncPdfs() {
-    const button = event.target;
-    const originalText = button.innerHTML;
-    
+// View note details
+async function viewNote(messageId, attachmentId) {
     try {
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing...';
-        button.disabled = true;
+        // Get the note data
+        const note = allNotes.find(n => n.metadata.message_id === messageId && n.metadata.attachment_id === attachmentId);
+        if (!note) return;
         
-        const response = await fetch('/gmail/sync-pdfs', { method: 'POST' });
-        const data = await response.json();
-        
-        if (response.ok) {
-            showNotification(`Successfully synced ${data.count} PDFs`, 'success');
-            await loadPdfData();
-        } else {
-            showNotification('Failed to sync PDFs: ' + data.detail, 'error');
-        }
-    } catch (error) {
-        console.error('Error syncing PDFs:', error);
-        showNotification('Error syncing PDFs', 'error');
-    } finally {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    }
-}
-
-// Process all PDFs
-async function processAllPdfs() {
-    const button = event.target;
-    const originalText = button.innerHTML;
-    
-    try {
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
-        button.disabled = true;
-        
-        const pendingPdfs = allPdfs.filter(pdf => !pdf.processed);
-        
-        if (pendingPdfs.length === 0) {
-            showNotification('No PDFs to process', 'warning');
-            return;
-        }
-        
-        let processed = 0;
-        for (const pdf of pendingPdfs) {
-            try {
-                const response = await fetch(`/gmail/local/process-with-ai/${pdf.metadata.message_id}/${pdf.metadata.attachment_id}`, {
-                    method: 'POST'
-                });
-                if (response.ok) {
-                    processed++;
-                }
-            } catch (error) {
-                console.error('Error processing PDF:', error);
+        // Get AI analysis if available
+        let analysis = null;
+        try {
+            const analysisResponse = await fetch(`/gmail/api/results/${messageId}/${attachmentId}`);
+            if (analysisResponse.ok) {
+                analysis = await analysisResponse.json();
             }
+        } catch (error) {
+            console.log('No analysis available for this note');
         }
         
-        showNotification(`Processed ${processed} out of ${pendingPdfs.length} PDFs`, 'success');
-        await loadPdfData();
+        // Update modal content
+        document.getElementById('modal-title').textContent = note.filename;
+        document.getElementById('modal-image').src = `/gmail/local/view-pdf/${messageId}/${attachmentId}`;
+        
+        const analysisElement = document.getElementById('modal-analysis');
+        if (analysis) {
+            analysisElement.innerHTML = `
+                <div class="space-y-4">
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-900 mb-2">Summary</h4>
+                        <p class="text-blue-800">${analysis.result.summary || 'No summary available'}</p>
+                    </div>
+                    
+                    ${analysis.result.tasks && analysis.result.tasks.length > 0 ? `
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-green-900 mb-2">Tasks Found</h4>
+                            <ul class="space-y-2">
+                                ${analysis.result.tasks.map(task => `
+                                    <li class="flex items-start space-x-2">
+                                        <input type="checkbox" class="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
+                                        <span class="text-green-800">${task}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-900 mb-2">Analysis Details</h4>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-600">Method:</span>
+                                <span class="font-medium">${analysis.result.method || 'AI Analysis'}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Confidence:</span>
+                                <span class="font-medium">${Math.round((analysis.result.confidence || 0.8) * 100)}%</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Pages:</span>
+                                <span class="font-medium">${analysis.result.pages_processed || 1}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Characters:</span>
+                                <span class="font-medium">${analysis.result.total_length || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            analysisElement.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-magic text-4xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500 mb-4">This note hasn't been processed yet</p>
+                    <button onclick="processNote('${messageId}', '${attachmentId}')" 
+                            class="bg-blue-600 text-white px-6 py-2 rounded-xl hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-magic mr-2"></i>Process Now
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Show modal
+        document.getElementById('note-modal').classList.remove('hidden');
+        
     } catch (error) {
-        console.error('Error processing PDFs:', error);
-        showNotification('Error processing PDFs', 'error');
-    } finally {
-        button.innerHTML = originalText;
-        button.disabled = false;
+        console.error('Error viewing note:', error);
+        showNotification('Error viewing note', 'error');
     }
 }
 
-// Process individual PDF
-async function processPdf(messageId, attachmentId) {
+// Process note
+async function processNote(messageId, attachmentId) {
     try {
-        const response = await fetch(`/gmail/local/process-with-ai/${messageId}/${attachmentId}`, {
+        const response = await fetch(`/gmail/local/process-with-multimodal/${messageId}/${attachmentId}`, {
             method: 'POST'
         });
         
         if (response.ok) {
-            showNotification('PDF processed successfully', 'success');
-            await loadPdfData();
+            showNotification('Note processed successfully!', 'success');
+            await loadNotes(); // Refresh the list
         } else {
-            const data = await response.json();
-            showNotification('Failed to process PDF: ' + data.detail, 'error');
+            showNotification('Error processing note', 'error');
         }
     } catch (error) {
-        console.error('Error processing PDF:', error);
-        showNotification('Error processing PDF', 'error');
+        console.error('Error processing note:', error);
+        showNotification('Error processing note', 'error');
     }
 }
 
-// View results
-function viewResults(messageId, attachmentId) {
-    // TODO: Navigate to results page
-    showNotification('Results viewer coming soon!', 'info');
+// Close modal
+function closeModal() {
+    document.getElementById('note-modal').classList.add('hidden');
 }
 
-// Delete PDF
-async function deletePdf(filename) {
-    if (!confirm('Are you sure you want to delete this PDF?')) {
-        return;
-    }
+// Refresh notes
+async function refreshNotes() {
+    const button = event.target;
+    const originalText = button.innerHTML;
     
     try {
-        const response = await fetch(`/gmail/stored-pdfs/${encodeURIComponent(filename)}`, {
-            method: 'DELETE'
-        });
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Refreshing...';
+        button.disabled = true;
         
-        if (response.ok) {
-            showNotification('PDF deleted successfully', 'success');
-            await loadPdfData();
-        } else {
-            const data = await response.json();
-            showNotification('Failed to delete PDF: ' + data.detail, 'error');
-        }
+        await loadNotes();
+        showNotification('Notes refreshed successfully', 'success');
     } catch (error) {
-        console.error('Error deleting PDF:', error);
-        showNotification('Error deleting PDF', 'error');
+        console.error('Error refreshing notes:', error);
+        showNotification('Error refreshing notes', 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
     }
 }
 
 // Show notification
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
         type === 'success' ? 'bg-green-500 text-white' :
         type === 'error' ? 'bg-red-500 text-white' :
-        type === 'warning' ? 'bg-yellow-500 text-white' :
         'bg-blue-500 text-white'
     }`;
     notification.textContent = message;
@@ -429,12 +428,19 @@ function showNotification(message, type = 'info') {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
-    loadPdfData();
+    loadNotes();
     
     // Filter and search event listeners
-    document.getElementById('status-filter').addEventListener('change', filterAndDisplayPdfs);
-    document.getElementById('sort-by').addEventListener('change', filterAndDisplayPdfs);
-    document.getElementById('search-input').addEventListener('input', filterAndDisplayPdfs);
+    document.getElementById('status-filter').addEventListener('change', renderNotes);
+    document.getElementById('date-filter').addEventListener('change', renderNotes);
+    document.getElementById('search-input').addEventListener('input', renderNotes);
+});
+
+// Close modal when clicking outside
+document.getElementById('note-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        closeModal();
+    }
 });
 </script>
 {% endblock %} 

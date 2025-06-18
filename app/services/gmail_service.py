@@ -278,4 +278,8 @@ class GmailService:
             print(f"AI result stored at: {result_path}")
             
         except Exception as e:
-            print(f"Failed to store AI result: {str(e)}") 
+            print(f"Failed to store AI result: {str(e)}")
+    
+    def _get_attachment_hash(self, attachment_id: str) -> str:
+        """Get a short hash of the attachment ID for filename generation."""
+        return hashlib.md5(attachment_id.encode()).hexdigest()[:8] 

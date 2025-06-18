@@ -7,7 +7,8 @@ An intelligent note processing system that automatically analyzes and organizes 
 ### Core Functionality
 - **Automated Gmail Integration**: Fetch PDF notes directly from your Gmail
 - **AI-Powered Analysis**: Extract tasks, summaries, dates, and topics from handwritten notes
-- **OCR Processing**: Convert handwritten text to searchable content
+- **Advanced OCR Processing**: Convert handwritten text to searchable content using EasyOCR (primary) and Tesseract (fallback)
+- **Multimodal LLM Processing**: Direct image-to-text processing using Ollama + LLaVA for superior handwritten text recognition
 - **Local & Cloud AI**: Support for both local rule-based and OpenAI processing
 
 ### Web Interface (v1.1.0)
@@ -29,7 +30,9 @@ An intelligent note processing system that automatically analyzes and organizes 
 
 - Python 3.9+
 - Gmail account with API access
-- Tesseract OCR (for handwritten text processing)
+- EasyOCR (for advanced handwritten text processing)
+- Tesseract OCR (fallback for text processing)
+- Ollama + LLaVA (for multimodal LLM processing)
 - OpenAI API key (optional, for advanced AI processing)
 
 ## 🛠️ Installation
@@ -55,7 +58,10 @@ pip install -r requirements.txt
 ```bash
 brew install tesseract
 brew install poppler
+brew install ollama
 ```
+
+**Note**: EasyOCR is automatically installed via pip and provides significantly better handwritten text recognition than Tesseract alone.
 
 5. **Set up environment variables**:
 ```bash
@@ -64,15 +70,24 @@ cp .env.example .env
 # - GMAIL_CLIENT_ID
 # - GMAIL_CLIENT_SECRET
 # - OPENAI_API_KEY (optional)
-# - AI_PROVIDER=local (or openai)
+# - AI_PROVIDER=multimodal (or local, openai)
 ```
 
-6. **Start the application**:
+6. **Set up Ollama and LLaVA**:
+```bash
+# Start Ollama service
+brew services start ollama
+
+# Pull the LLaVA model (this may take several minutes)
+ollama pull llava
+```
+
+7. **Start the application**:
 ```bash
 uvicorn app.main:app --reload
 ```
 
-7. **Access the web interface**:
+8. **Access the web interface**:
    - Open http://localhost:8000 in your browser
    - Navigate through the dashboard, PDFs, results, and settings
 
@@ -111,7 +126,7 @@ GMAIL_CLIENT_ID=your_gmail_client_id
 GMAIL_CLIENT_SECRET=your_gmail_client_secret
 
 # AI Configuration
-AI_PROVIDER=local  # or openai
+AI_PROVIDER=multimodal  # Options: local, openai, multimodal
 OPENAI_API_KEY=your_openai_api_key  # optional
 
 # Processing Configuration
