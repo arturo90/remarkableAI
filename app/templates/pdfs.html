@@ -16,6 +16,9 @@
                     <button onclick="refreshNotes()" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
                         <i class="fas fa-refresh mr-2"></i>Refresh
                     </button>
+                    <button onclick="processMultipleNotes()" class="bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition-colors">
+                        <i class="fas fa-magic mr-2"></i>Process All
+                    </button>
                     <a href="/" class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors font-semibold">
                         <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
                     </a>
@@ -117,6 +120,37 @@
     </div>
 </div>
 
+<!-- Progress Modal for AI Processing -->
+<div id="progress-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+        <div class="text-center">
+            <div class="mb-4">
+                <i class="fas fa-magic text-4xl text-blue-600 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Processing Notes</h3>
+                <p class="text-gray-600" id="progress-status">Initializing...</p>
+            </div>
+            
+            <div class="mb-6">
+                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                    <span id="progress-current">0</span>
+                    <span id="progress-total">0</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div id="processing-items" class="space-y-2 max-h-40 overflow-y-auto">
+                <!-- Processing items will be added here -->
+            </div>
+            
+            <button id="cancel-processing" class="mt-4 text-gray-500 hover:text-gray-700 text-sm">
+                Cancel Processing
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Note Detail Modal -->
 <div id="note-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
     <div class="flex items-center justify-center min-h-screen p-4">
@@ -156,6 +190,11 @@
 let allNotes = [];
 let processedNotes = [];
 
+// Global variables for processing
+let processingQueue = [];
+let isProcessing = false;
+let processingCancelled = false;
+
 // Load notes data
 async function loadNotes() {
     try {
@@ -163,6 +202,19 @@ async function loadNotes() {
         if (response.ok) {
             const data = await response.json();
             allNotes = data.pdfs || []; // Extract the pdfs array from the response
+            
+            // Also load processed results to check processing status
+            try {
+                const resultsResponse = await fetch('/gmail/api/results/list');
+                if (resultsResponse.ok) {
+                    const resultsData = await resultsResponse.json();
+                    window.processedResults = resultsData.results || [];
+                }
+            } catch (error) {
+                console.log('Could not load results:', error);
+                window.processedResults = [];
+            }
+            
             updateStats();
             renderNotes();
         } else {
@@ -217,7 +269,20 @@ function renderNotes() {
     emptyState.classList.add('hidden');
     
     grid.innerHTML = allNotes.map(note => {
-        const date = new Date(note.metadata.date);
+        // Extract filename from metadata or use original filename
+        const filename = note.metadata?.filename || note.metadata?.original_filename || 'Unknown Document';
+        
+        // Parse date from metadata
+        let dateDisplay = 'Unknown Date';
+        if (note.metadata?.date) {
+            try {
+                const date = new Date(parseInt(note.metadata.date));
+                dateDisplay = date.toLocaleDateString();
+            } catch (e) {
+                dateDisplay = 'Invalid Date';
+            }
+        }
+        
         const isProcessed = checkIfProcessed(note.metadata.message_id, note.metadata.attachment_id);
         
         return `
@@ -225,8 +290,8 @@ function renderNotes() {
                 <div class="p-6">
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-lg font-semibold text-gray-900 truncate">${note.filename}</h3>
-                            <p class="text-sm text-gray-500">${date.toLocaleDateString()}</p>
+                            <h3 class="text-lg font-semibold text-gray-900 truncate">${filename}</h3>
+                            <p class="text-sm text-gray-500">${dateDisplay}</p>
                         </div>
                         <div class="ml-4">
                             ${isProcessed ? 
@@ -237,8 +302,8 @@ function renderNotes() {
                     </div>
                     
                     <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
-                        <span>${note.metadata.pages} pages</span>
-                        <span>${formatFileSize(note.metadata.size || 0)}</span>
+                        <span>${note.metadata?.pages || 1} pages</span>
+                        <span>${formatFileSize(note.metadata?.size || 0)}</span>
                     </div>
                     
                     <div class="flex space-x-2">
@@ -261,8 +326,12 @@ function renderNotes() {
 
 // Check if note is processed
 function checkIfProcessed(messageId, attachmentId) {
-    // This would need to be implemented based on your results data
-    // For now, return false
+    // Check if this note has been processed by looking at the results
+    if (window.processedResults && window.processedResults.length > 0) {
+        return window.processedResults.some(result => 
+            result.message_id === messageId && result.attachment_id === attachmentId
+        );
+    }
     return false;
 }
 
@@ -368,18 +437,61 @@ async function viewNote(messageId, attachmentId) {
 // Process note
 async function processNote(messageId, attachmentId) {
     try {
+        // Find the note to get its filename
+        const note = allNotes.find(n => n.metadata.message_id === messageId && n.metadata.attachment_id === attachmentId);
+        const filename = note?.metadata?.filename || note?.metadata?.original_filename || 'Unknown Document';
+        
+        // Show progress for single note
+        processingQueue = [{
+            messageId: messageId,
+            attachmentId: attachmentId,
+            filename: filename,
+            status: 'processing',
+            error: null
+        }];
+        
+        showProgressModal();
+        updateProgressUI();
+        
         const response = await fetch(`/gmail/local/process-with-multimodal/${messageId}/${attachmentId}`, {
             method: 'POST'
         });
         
         if (response.ok) {
+            processingQueue[0].status = 'completed';
+            updateProgressUI();
+            
+            // Wait a moment to show completion
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            hideProgressModal();
             showNotification('Note processed successfully!', 'success');
             await loadNotes(); // Refresh the list
         } else {
+            const errorData = await response.json().catch(() => ({}));
+            processingQueue[0].status = 'failed';
+            processingQueue[0].error = errorData.detail || 'Processing failed';
+            updateProgressUI();
+            
+            // Wait a moment to show error
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            hideProgressModal();
             showNotification('Error processing note', 'error');
         }
     } catch (error) {
         console.error('Error processing note:', error);
+        
+        if (processingQueue.length > 0) {
+            processingQueue[0].status = 'failed';
+            processingQueue[0].error = error.message;
+            updateProgressUI();
+            
+            // Wait a moment to show error
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            hideProgressModal();
+        }
+        
         showNotification('Error processing note', 'error');
     }
 }
@@ -441,6 +553,170 @@ document.getElementById('note-modal').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) {
         closeModal();
     }
+});
+
+// Process multiple notes
+async function processMultipleNotes() {
+    const unprocessedNotes = allNotes.filter(note => !checkIfProcessed(note.metadata.message_id, note.metadata.attachment_id));
+    
+    if (unprocessedNotes.length === 0) {
+        showNotification('All notes have already been processed!', 'info');
+        return;
+    }
+    
+    // Initialize processing queue
+    processingQueue = unprocessedNotes.map(note => ({
+        messageId: note.metadata.message_id,
+        attachmentId: note.metadata.attachment_id,
+        filename: note.metadata?.filename || note.metadata?.original_filename || 'Unknown Document',
+        status: 'pending', // pending, processing, completed, failed
+        error: null
+    }));
+    
+    isProcessing = true;
+    processingCancelled = false;
+    
+    // Show progress modal
+    showProgressModal();
+    updateProgressUI();
+    
+    // Process each note sequentially
+    for (let i = 0; i < processingQueue.length; i++) {
+        if (processingCancelled) break;
+        
+        const item = processingQueue[i];
+        item.status = 'processing';
+        updateProgressUI();
+        
+        try {
+            await processSingleNote(item.messageId, item.attachmentId);
+            item.status = 'completed';
+        } catch (error) {
+            item.status = 'failed';
+            item.error = error.message;
+            console.error(`Failed to process ${item.filename}:`, error);
+        }
+        
+        updateProgressUI();
+        
+        // Small delay between processing to avoid overwhelming the server
+        if (i < processingQueue.length - 1 && !processingCancelled) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    
+    // Hide progress modal and refresh
+    hideProgressModal();
+    isProcessing = false;
+    
+    if (!processingCancelled) {
+        showNotification(`Processing completed! ${processingQueue.filter(item => item.status === 'completed').length} of ${processingQueue.length} notes processed.`, 'success');
+        await loadNotes(); // Refresh the list
+    } else {
+        showNotification('Processing cancelled.', 'info');
+    }
+}
+
+// Process a single note
+async function processSingleNote(messageId, attachmentId) {
+    const response = await fetch(`/gmail/local/process-with-multimodal/${messageId}/${attachmentId}`, {
+        method: 'POST'
+    });
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+}
+
+// Show progress modal
+function showProgressModal() {
+    document.getElementById('progress-modal').classList.remove('hidden');
+}
+
+// Hide progress modal
+function hideProgressModal() {
+    document.getElementById('progress-modal').classList.add('hidden');
+}
+
+// Update progress UI
+function updateProgressUI() {
+    const completed = processingQueue.filter(item => item.status === 'completed').length;
+    const total = processingQueue.length;
+    const percentage = total > 0 ? (completed / total) * 100 : 0;
+    
+    // Update progress bar
+    document.getElementById('progress-current').textContent = completed;
+    document.getElementById('progress-total').textContent = total;
+    document.getElementById('progress-bar').style.width = `${percentage}%`;
+    
+    // Update status text
+    const currentProcessing = processingQueue.find(item => item.status === 'processing');
+    if (currentProcessing) {
+        document.getElementById('progress-status').textContent = `Processing: ${currentProcessing.filename}`;
+    } else if (completed === total) {
+        document.getElementById('progress-status').textContent = 'Processing completed!';
+    } else {
+        document.getElementById('progress-status').textContent = `Processed ${completed} of ${total} notes`;
+    }
+    
+    // Update processing items list
+    const itemsContainer = document.getElementById('processing-items');
+    itemsContainer.innerHTML = processingQueue.map(item => {
+        let statusIcon, statusColor, statusText;
+        
+        switch (item.status) {
+            case 'pending':
+                statusIcon = 'fa-clock';
+                statusColor = 'text-gray-400';
+                statusText = 'Pending';
+                break;
+            case 'processing':
+                statusIcon = 'fa-spinner fa-spin';
+                statusColor = 'text-blue-600';
+                statusText = 'Processing...';
+                break;
+            case 'completed':
+                statusIcon = 'fa-check';
+                statusColor = 'text-green-600';
+                statusText = 'Completed';
+                break;
+            case 'failed':
+                statusIcon = 'fa-times';
+                statusColor = 'text-red-600';
+                statusText = 'Failed';
+                break;
+        }
+        
+        return `
+            <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">${item.filename}</p>
+                    ${item.error ? `<p class="text-xs text-red-600">${item.error}</p>` : ''}
+                </div>
+                <div class="ml-2">
+                    <i class="fas ${statusIcon} ${statusColor}"></i>
+                    <span class="text-xs text-gray-600 ml-1">${statusText}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Cancel processing
+function cancelProcessing() {
+    processingCancelled = true;
+    hideProgressModal();
+    isProcessing = false;
+    showNotification('Processing cancelled.', 'info');
+}
+
+// Add event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Add cancel button event listener
+    document.getElementById('cancel-processing').addEventListener('click', cancelProcessing);
 });
 </script>
 {% endblock %} 
