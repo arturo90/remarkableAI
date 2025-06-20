@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     GMAIL_REDIRECT_URI: str = "http://localhost:8000/gmail/callback"
     
     # AI Processing
-    AI_PROVIDER: str = "local"  # Options: "local", "openai", "multimodal"
+    AI_PROVIDER: str = "local"  # Options: "local", "openai", "multimodal", "openai_multimodal"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     

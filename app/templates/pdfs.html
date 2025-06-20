@@ -312,10 +312,28 @@ function renderNotes() {
                             <i class="fas fa-eye mr-2"></i>View
                         </button>
                         ${!isProcessed ? `
-                            <button onclick="processNote('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
-                                    class="bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700 transition-colors font-medium">
-                                <i class="fas fa-magic"></i>
-                            </button>
+                            <div class="relative">
+                                <button onclick="toggleProcessingDropdown('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
+                                        class="bg-green-600 text-white py-2 px-4 rounded-xl hover:bg-green-700 transition-colors font-medium">
+                                    <i class="fas fa-magic mr-1"></i>Process
+                                    <i class="fas fa-chevron-down ml-1 text-xs"></i>
+                                </button>
+                                <div id="processing-dropdown-${note.metadata.message_id}-${note.metadata.attachment_id}" 
+                                     class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 hidden z-10">
+                                    <div class="py-1">
+                                        <button onclick="processNote('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                            <i class="fas fa-robot mr-2 text-blue-600"></i>
+                                            Local Multimodal (LLaVA)
+                                        </button>
+                                        <button onclick="processNoteWithOpenAI('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
+                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                            <i class="fas fa-eye mr-2 text-purple-600"></i>
+                                            OpenAI Vision (GPT-4)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         ` : ''}
                     </div>
                 </div>
@@ -496,6 +514,85 @@ async function processNote(messageId, attachmentId) {
     }
 }
 
+// Process note with OpenAI multimodal
+async function processNoteWithOpenAI(messageId, attachmentId) {
+    try {
+        // Find the note to get its filename
+        const note = allNotes.find(n => n.metadata.message_id === messageId && n.metadata.attachment_id === attachmentId);
+        const filename = note?.metadata?.filename || note?.metadata?.original_filename || 'Unknown Document';
+        
+        // Show progress for single note
+        processingQueue = [{
+            messageId: messageId,
+            attachmentId: attachmentId,
+            filename: filename,
+            status: 'processing',
+            error: null
+        }];
+        
+        showProgressModal();
+        updateProgressUI();
+        
+        const response = await fetch(`/gmail/local/process-with-openai-multimodal/${messageId}/${attachmentId}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            processingQueue[0].status = 'completed';
+            updateProgressUI();
+            
+            // Wait a moment to show completion
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            hideProgressModal();
+            showNotification('Note processed successfully with OpenAI Vision!', 'success');
+            await loadNotes(); // Refresh the list
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            processingQueue[0].status = 'failed';
+            processingQueue[0].error = errorData.detail || 'Processing failed';
+            updateProgressUI();
+            
+            // Wait a moment to show error
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            hideProgressModal();
+            showNotification('Error processing note with OpenAI Vision', 'error');
+        }
+    } catch (error) {
+        console.error('Error processing note with OpenAI Vision:', error);
+        
+        if (processingQueue.length > 0) {
+            processingQueue[0].status = 'failed';
+            processingQueue[0].error = error.message;
+            updateProgressUI();
+            
+            // Wait a moment to show error
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            hideProgressModal();
+        }
+        
+        showNotification('Error processing note with OpenAI Vision', 'error');
+    }
+}
+
+// Toggle processing dropdown
+function toggleProcessingDropdown(messageId, attachmentId) {
+    const dropdownId = `processing-dropdown-${messageId}-${attachmentId}`;
+    const dropdown = document.getElementById(dropdownId);
+    
+    // Close all other dropdowns first
+    const allDropdowns = document.querySelectorAll('[id^="processing-dropdown-"]');
+    allDropdowns.forEach(d => {
+        if (d.id !== dropdownId) {
+            d.classList.add('hidden');
+        }
+    });
+    
+    // Toggle current dropdown
+    dropdown.classList.toggle('hidden');
+}
+
 // Close modal
 function closeModal() {
     document.getElementById('note-modal').classList.add('hidden');
@@ -546,6 +643,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('status-filter').addEventListener('change', renderNotes);
     document.getElementById('date-filter').addEventListener('change', renderNotes);
     document.getElementById('search-input').addEventListener('input', renderNotes);
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[id^="processing-dropdown-"]') && !e.target.closest('button[onclick*="toggleProcessingDropdown"]')) {
+            const allDropdowns = document.querySelectorAll('[id^="processing-dropdown-"]');
+            allDropdowns.forEach(d => d.classList.add('hidden'));
+        }
+    });
 });
 
 // Close modal when clicking outside

@@ -468,6 +468,41 @@ function showTasks(results, taskFilter) {
 function showSummaries(results) {
     const summariesList = document.getElementById('summaries-list');
     
+    // Helper function to clean up summary text
+    function cleanSummaryText(text) {
+        if (!text) return 'No summary available';
+        
+        // If it looks like JSON, try to extract meaningful content
+        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
+            try {
+                const parsed = JSON.parse(text);
+                if (parsed.summary) {
+                    return parsed.summary;
+                } else if (parsed.transcription) {
+                    return parsed.transcription.substring(0, 200) + '...';
+                } else {
+                    // Extract any text content from JSON
+                    const textContent = JSON.stringify(parsed).replace(/[{}"\[\]]/g, ' ').replace(/,/g, ' ');
+                    return textContent.substring(0, 200) + '...';
+                }
+            } catch (e) {
+                // If JSON parsing fails, clean up the text
+                return text.replace(/[{}"\[\]]/g, ' ').replace(/,/g, ' ').substring(0, 200) + '...';
+            }
+        }
+        
+        // Remove any JSON-like patterns from the text
+        let cleanText = text;
+        cleanText = cleanText.replace(/\{[^{}]*\}/g, ''); // Remove JSON objects
+        cleanText = cleanText.replace(/"[^"]*":\s*"[^"]*"/g, ''); // Remove JSON key-value pairs
+        cleanText = cleanText.replace(/"[^"]*":\s*\[[^\]]*\]/g, ''); // Remove JSON arrays
+        cleanText = cleanText.replace(/[{}"\[\]]/g, ' '); // Remove remaining JSON characters
+        cleanText = cleanText.replace(/,/g, ' '); // Replace commas with spaces
+        cleanText = cleanText.replace(/\s+/g, ' ').trim(); // Normalize whitespace
+        
+        return cleanText || 'Handwritten notes requiring further analysis.';
+    }
+    
     if (results.length === 0) {
         summariesList.innerHTML = `
             <div class="text-center py-12">
@@ -496,7 +531,7 @@ function showSummaries(results) {
                     ` : ''}
                 </div>
             </div>
-            <p class="text-gray-700 leading-relaxed mb-4">${result.result.summary || 'No summary available'}</p>
+            <p class="text-gray-700 leading-relaxed mb-4">${cleanSummaryText(result.result.summary)}</p>
             <div class="flex items-center space-x-4">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     ${Math.round((result.result.confidence || 0.8) * 100)}% confidence

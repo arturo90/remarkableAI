@@ -27,7 +27,6 @@ openai==0.28.1
 
 # Additional utilities
 requests==2.31.0
-base64  # Built-in, but documenting for clarity
 
 # Database
 sqlalchemy==2.0.23

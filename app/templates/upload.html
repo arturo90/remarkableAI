@@ -75,7 +75,7 @@
         <!-- Processing Options -->
         <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Processing Options</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="flex items-center p-4 border rounded-lg">
                     <input type="radio" id="standardAI" name="processingType" value="standard" class="mr-3" checked>
                     <div>
@@ -86,8 +86,15 @@
                 <div class="flex items-center p-4 border rounded-lg">
                     <input type="radio" id="multimodalAI" name="processingType" value="multimodal" class="mr-3">
                     <div>
-                        <label for="multimodalAI" class="font-medium text-gray-900">Multimodal LLM</label>
+                        <label for="multimodalAI" class="font-medium text-gray-900">Local Multimodal LLM</label>
                         <p class="text-sm text-gray-600">Uses LLaVA for superior handwritten text recognition</p>
+                    </div>
+                </div>
+                <div class="flex items-center p-4 border rounded-lg">
+                    <input type="radio" id="openaiMultimodalAI" name="processingType" value="openai_multimodal" class="mr-3">
+                    <div>
+                        <label for="openaiMultimodalAI" class="font-medium text-gray-900">OpenAI Multimodal</label>
+                        <p class="text-sm text-gray-600">Uses GPT-4 Vision for superior handwritten text recognition</p>
                     </div>
                 </div>
             </div>
@@ -212,7 +219,13 @@
                 formData.append('file', currentFile);
                 
                 const processingType = document.querySelector('input[name="processingType"]:checked').value;
-                const endpoint = processingType === 'multimodal' ? '/gmail/upload-pdf-multimodal' : '/gmail/upload-pdf';
+                let endpoint = '/gmail/upload-pdf'; // default
+                
+                if (processingType === 'multimodal') {
+                    endpoint = '/gmail/upload-pdf-multimodal';
+                } else if (processingType === 'openai_multimodal') {
+                    endpoint = '/gmail/upload-pdf-openai-multimodal';
+                }
                 
                 updateProgress(20, 'Uploading file...');
                 
@@ -268,6 +281,41 @@
         function showResults(result) {
             const { result: aiResult, metadata } = result;
             
+            // Helper function to clean up summary text
+            function cleanSummaryText(text) {
+                if (!text) return 'No summary available';
+                
+                // If it looks like JSON, try to extract meaningful content
+                if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
+                    try {
+                        const parsed = JSON.parse(text);
+                        if (parsed.summary) {
+                            return parsed.summary;
+                        } else if (parsed.transcription) {
+                            return parsed.transcription.substring(0, 200) + '...';
+                        } else {
+                            // Extract any text content from JSON
+                            const textContent = JSON.stringify(parsed).replace(/[{}"\[\]]/g, ' ').replace(/,/g, ' ');
+                            return textContent.substring(0, 200) + '...';
+                        }
+                    } catch (e) {
+                        // If JSON parsing fails, clean up the text
+                        return text.replace(/[{}"\[\]]/g, ' ').replace(/,/g, ' ').substring(0, 200) + '...';
+                    }
+                }
+                
+                // Remove any JSON-like patterns from the text
+                let cleanText = text;
+                cleanText = cleanText.replace(/\{[^{}]*\}/g, ''); // Remove JSON objects
+                cleanText = cleanText.replace(/"[^"]*":\s*"[^"]*"/g, ''); // Remove JSON key-value pairs
+                cleanText = cleanText.replace(/"[^"]*":\s*\[[^\]]*\]/g, ''); // Remove JSON arrays
+                cleanText = cleanText.replace(/[{}"\[\]]/g, ' '); // Remove remaining JSON characters
+                cleanText = cleanText.replace(/,/g, ' '); // Replace commas with spaces
+                cleanText = cleanText.replace(/\s+/g, ' ').trim(); // Normalize whitespace
+                
+                return cleanText || 'Handwritten notes requiring further analysis.';
+            }
+            
             let html = `
                 <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                     <div class="flex items-center">
@@ -301,11 +349,12 @@
             `;
             
             if (aiResult && aiResult.summary) {
+                const cleanSummary = cleanSummaryText(aiResult.summary);
                 html += `
                     <div class="mt-6">
                         <h4 class="font-medium text-gray-900 mb-2">AI Summary</h4>
                         <div class="bg-gray-50 rounded p-3">
-                            <p class="text-gray-700">${aiResult.summary}</p>
+                            <p class="text-gray-700">${cleanSummary}</p>
                         </div>
                     </div>
                 `;

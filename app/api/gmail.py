@@ -435,6 +435,53 @@ async def process_pdf_with_multimodal(message_id: str, attachment_id: str):
             detail=f"Failed to process PDF with multimodal LLM: {str(e)}"
         )
 
+@router.post("/local/process-with-openai-multimodal/{message_id}/{attachment_id}")
+async def process_pdf_with_openai_multimodal(message_id: str, attachment_id: str):
+    """Process a local PDF using OpenAI's multimodal capabilities (GPT-4 Vision) for better handwritten text recognition."""
+    try:
+        print(f"OpenAI Multimodal processing - Message ID: {message_id}, Attachment ID: {attachment_id}")
+        
+        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
+        if not file_path or not os.path.exists(file_path):
+            print(f"Local PDF not found: {file_path}")
+            raise HTTPException(status_code=404, detail="Local PDF not found. Please sync first.")
+        
+        print(f"Found local PDF at: {file_path}")
+        
+        # Initialize AI processor with OpenAI multimodal provider
+        ai_processor = AIProcessor()
+        # Temporarily set provider to openai_multimodal for this request
+        original_provider = ai_processor.provider
+        ai_processor.provider = "openai_multimodal"
+        
+        print("Starting OpenAI multimodal PDF processing...")
+        result = ai_processor.process_with_openai_multimodal(str(file_path))
+        print(f"OpenAI multimodal PDF processing completed successfully")
+        
+        # Restore original provider
+        ai_processor.provider = original_provider
+        
+        # Store the result
+        gmail_service.store_ai_result(message_id, attachment_id, result)
+        
+        return {
+            "message": "OpenAI multimodal PDF processing completed successfully", 
+            "result": result, 
+            "file_path": str(file_path),
+            "method": "openai_vision"
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        print(f"Unexpected error in OpenAI multimodal processing: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process PDF with OpenAI multimodal: {str(e)}"
+        )
+
 # Results API endpoints
 @router.get("/api/results/list")
 async def list_results():
@@ -683,4 +730,83 @@ async def upload_pdf_multimodal(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to upload and process PDF with multimodal LLM: {str(e)}"
+        )
+
+@router.post("/upload-pdf-openai-multimodal")
+async def upload_pdf_openai_multimodal(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None
+):
+    """Upload a PDF file manually and process it with OpenAI's multimodal capabilities (GPT-4 Vision)."""
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF files are allowed"
+            )
+        
+        # Read the uploaded file
+        pdf_data = await file.read()
+        
+        if len(pdf_data) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Empty file uploaded"
+            )
+        
+        # Create metadata for the uploaded file
+        metadata = {
+            'message_id': f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'attachment_id': f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}",
+            'subject': f"Manual Upload: {file.filename}",
+            'date': str(int(datetime.now().timestamp() * 1000)),
+            'from': 'Manual Upload',
+            'filename': file.filename,
+            'upload_type': 'manual'
+        }
+        
+        # Store the PDF locally
+        file_path = pdf_service.store_pdf(pdf_data, file.filename, metadata)
+        
+        # Initialize AI processor with OpenAI multimodal provider
+        ai_processor = AIProcessor()
+        # Temporarily set provider to openai_multimodal for this request
+        original_provider = ai_processor.provider
+        ai_processor.provider = "openai_multimodal"
+        
+        # Process the PDF with OpenAI multimodal
+        print(f"Processing uploaded PDF with OpenAI multimodal: {file_path}")
+        result = ai_processor.process_with_openai_multimodal(file_path)
+        
+        # Restore original provider
+        ai_processor.provider = original_provider
+        
+        # Store the AI result
+        if background_tasks:
+            background_tasks.add_task(
+                gmail_service.store_ai_result,
+                metadata['message_id'],
+                metadata['attachment_id'],
+                result
+            )
+        
+        return {
+            "message": "PDF uploaded and processed with OpenAI multimodal successfully",
+            "result": result,
+            "file_path": file_path,
+            "metadata": metadata,
+            "uploaded_at": datetime.now().isoformat(),
+            "method": "openai_vision"
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        print(f"Unexpected error in upload_pdf_openai_multimodal: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload and process PDF with OpenAI multimodal: {str(e)}"
         ) 

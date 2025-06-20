@@ -5,10 +5,12 @@ An intelligent note processing system that automatically analyzes and organizes 
 ## 🚀 Features
 
 ### Core Functionality
-- **Automated Gmail Integration**: Fetch PDF notes directly from your Gmail
-- **AI-Powered Analysis**: Extract tasks, summaries, dates, and topics from handwritten notes
-- **Advanced OCR Processing**: Convert handwritten text to searchable content using EasyOCR (primary) and Tesseract (fallback)
+- **Gmail Integration**: Automatic PDF sync from Gmail attachments
+- **AI-Powered Analysis**: Extract tasks, summaries, topics, and dates from handwritten notes
+- **Multiple AI Providers**: Support for local processing, OpenAI, and multimodal LLM
+- **OCR Processing**: Advanced text extraction with EasyOCR and Tesseract
 - **Multimodal LLM Processing**: Direct image-to-text processing using Ollama + LLaVA for superior handwritten text recognition
+- **OpenAI Multimodal Processing**: Direct image-to-text processing using GPT-4 Vision for superior handwritten text recognition
 - **Local & Cloud AI**: Support for both local rule-based and OpenAI processing
 
 ### Web Interface (v1.1.0)
@@ -126,8 +128,8 @@ GMAIL_CLIENT_ID=your_gmail_client_id
 GMAIL_CLIENT_SECRET=your_gmail_client_secret
 
 # AI Configuration
-AI_PROVIDER=multimodal  # Options: local, openai, multimodal
-OPENAI_API_KEY=your_openai_api_key  # optional
+AI_PROVIDER=multimodal  # Options: local, openai, multimodal, openai_multimodal
+OPENAI_API_KEY=your_openai_api_key  # required for openai and openai_multimodal
 
 # Processing Configuration
 OCR_ENABLED=true
@@ -143,6 +145,21 @@ AUTO_PROCESS=false
 5. Add your email as a test user
 6. Download credentials and add to `.env` file
 
+### AI Providers
+
+The application supports multiple AI providers for processing handwritten notes:
+
+- **local**: Rule-based processing with OCR extraction (free, no API key required)
+- **openai**: Text-based processing using OpenAI's GPT models (requires OpenAI API key)
+- **multimodal**: Local multimodal processing using Ollama + LLaVA (requires Ollama setup)
+- **openai_multimodal**: Cloud-based multimodal processing using GPT-4 Vision (requires OpenAI API key)
+
+**Recommendations:**
+- Use **local** for basic processing without external dependencies
+- Use **openai** for high-quality text analysis (requires API key)
+- Use **multimodal** for superior handwritten text recognition (requires Ollama + LLaVA)
+- Use **openai_multimodal** for the best handwritten text recognition (requires OpenAI API key)
+
 ## 🧪 Testing
 
 Run the test suite:
@@ -154,6 +171,13 @@ Run with coverage:
 ```bash
 pytest --cov=app tests/
 ```
+
+Test OpenAI multimodal functionality:
+```bash
+python test_openai_multimodal.py
+```
+
+**Note**: The OpenAI multimodal test requires a valid OpenAI API key and at least one PDF file in the storage/pdfs directory.
 
 ## 📊 API Documentation
 
