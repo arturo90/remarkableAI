@@ -7,11 +7,13 @@ import pickle
 import base64
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from app.core.config import get_settings
+from app.core.config import get_settings, get_google_oauth_config
 from app.services.pdf_service import PDFService
 from app.services.ai_processor import AIProcessor
 from fastapi import HTTPException
 import hashlib
+import requests
+import time
 
 class GmailService:
     """Service for interacting with Gmail API."""
@@ -282,4 +284,125 @@ class GmailService:
     
     def _get_attachment_hash(self, attachment_id: str) -> str:
         """Get a short hash of the attachment ID for filename generation."""
-        return hashlib.md5(attachment_id.encode()).hexdigest()[:8] 
+        return hashlib.md5(attachment_id.encode()).hexdigest()[:8]
+
+GOOGLE_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth'
+GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+GOOGLE_API_BASE = 'https://gmail.googleapis.com/gmail/v1/'
+GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3/'
+
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'openid',
+]
+CALENDAR_SCOPES = SCOPES + [
+    'https://www.googleapis.com/auth/calendar.events',
+]
+
+def get_auth_url(state=None):
+    config = get_google_oauth_config()
+    params = {
+        'client_id': config['client_id'],
+        'redirect_uri': config['redirect_uri'],
+        'response_type': 'code',
+        'scope': ' '.join(SCOPES),
+        'access_type': 'offline',
+        'prompt': 'consent',
+    }
+    if state:
+        params['state'] = state
+    from urllib.parse import urlencode
+    return f"{GOOGLE_AUTH_BASE}?{urlencode(params)}"
+
+def exchange_code_for_tokens(code):
+    config = get_google_oauth_config()
+    data = {
+        'code': code,
+        'client_id': config['client_id'],
+        'client_secret': config['client_secret'],
+        'redirect_uri': config['redirect_uri'],
+        'grant_type': 'authorization_code',
+    }
+    resp = requests.post(GOOGLE_TOKEN_URL, data=data)
+    resp.raise_for_status()
+    tokens = resp.json()
+    return {
+        'access_token': tokens['access_token'],
+        'refresh_token': tokens.get('refresh_token'),
+        'expires_at': int(time.time()) + tokens.get('expires_in', 3600)
+    }
+
+def refresh_access_token(tokens):
+    config = get_google_oauth_config()
+    if not tokens or not tokens.get('refresh_token'):
+        return None
+    data = {
+        'client_id': config['client_id'],
+        'client_secret': config['client_secret'],
+        'refresh_token': tokens['refresh_token'],
+        'grant_type': 'refresh_token',
+    }
+    resp = requests.post(GOOGLE_TOKEN_URL, data=data)
+    resp.raise_for_status()
+    new_tokens = resp.json()
+    tokens['access_token'] = new_tokens['access_token']
+    tokens['expires_at'] = int(time.time()) + new_tokens.get('expires_in', 3600)
+    return tokens
+
+def get_access_token(tokens):
+    if not tokens:
+        return None, tokens
+    if tokens['expires_at'] < int(time.time()):
+        tokens = refresh_access_token(tokens)
+    return tokens['access_token'] if tokens else None, tokens
+
+def gmail_api_get(endpoint, tokens):
+    access_token, tokens = get_access_token(tokens)
+    if not access_token:
+        return None, tokens
+    headers = {'Authorization': f'Bearer {access_token}'}
+    resp = requests.get(f'{GOOGLE_API_BASE}{endpoint}', headers=headers)
+    resp.raise_for_status()
+    return resp.json(), tokens
+
+def revoke_tokens(tokens):
+    if tokens and tokens.get('access_token'):
+        requests.post('https://oauth2.googleapis.com/revoke', params={'token': tokens['access_token']})
+
+def get_calendar_auth_url(state=None):
+    config = get_google_oauth_config()
+    params = {
+        'client_id': config['client_id'],
+        'redirect_uri': config['redirect_uri'],
+        'response_type': 'code',
+        'scope': ' '.join(CALENDAR_SCOPES),
+        'access_type': 'offline',
+        'prompt': 'consent',
+    }
+    if state:
+        params['state'] = state
+    from urllib.parse import urlencode
+    return f"{GOOGLE_AUTH_BASE}?{urlencode(params)}"
+
+def calendar_list_calendars(tokens):
+    access_token, tokens = get_access_token(tokens)
+    if not access_token:
+        return None, tokens
+    headers = {'Authorization': f'Bearer {access_token}'}
+    resp = requests.get(f'{GOOGLE_CALENDAR_API_BASE}users/me/calendarList', headers=headers)
+    resp.raise_for_status()
+    return resp.json(), tokens
+
+def calendar_create_event(tokens, calendar_id, event):
+    access_token, tokens = get_access_token(tokens)
+    if not access_token:
+        return None, tokens
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+    resp = requests.post(f'{GOOGLE_CALENDAR_API_BASE}calendars/{calendar_id}/events', headers=headers, json=event)
+    resp.raise_for_status()
+    return resp.json(), tokens 

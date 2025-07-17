@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>My Google Calendars</h2>
+{% if calendars|length == 0 %}
+  <p>No calendars found. Please connect your Google Calendar.</p>
+{% else %}
+  <ul>
+    {% for cal in calendars %}
+      <li>
+        <strong>{{ cal.summary }}</strong><br>
+        ID: <code>{{ cal.id }}</code>
+      </li>
+    {% endfor %}
+  </ul>
+  <p>Copy the calendar ID to use when adding tasks, or return to <a href="/pdf_tasks">PDF Tasks</a> to add a task to your calendar.</p>
+{% endif %}
+{% endblock %} 

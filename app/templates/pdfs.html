@@ -824,4 +824,43 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('cancel-processing').addEventListener('click', cancelProcessing);
 });
 </script>
+
+<h2>PDF Tasks</h2>
+<a href="/calendar/list">View My Calendars</a>
+<ul>
+  {% for task in tasks %}
+    <li>
+      <strong>{{ task.title }}</strong><br>
+      {{ task.description }}<br>
+      Due: {{ task.due_date }}<br>
+      <form action="/calendar/add_task" method="post" style="margin-top:8px;">
+        <input type="hidden" name="title" value="{{ task.title }}">
+        <input type="hidden" name="description" value="{{ task.description }}">
+        <input type="hidden" name="due_date" value="{{ task.due_date }}">
+        <label for="calendar_id_{{ loop.index }}">Add to calendar:</label>
+        <select name="calendar_id" id="calendar_id_{{ loop.index }}">
+          <!-- Calendar options will be populated by JS or user can visit /calendar/list to see IDs -->
+        </select>
+        <button type="submit">Add to Calendar</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+
+<script>
+// Optionally, fetch calendars and populate dropdowns
+fetch('/calendar/list', {headers: {'accept': 'application/json'}})
+  .then(resp => resp.json())
+  .then(data => {
+    const calendars = data.calendars || data.items || [];
+    document.querySelectorAll('select[name="calendar_id"]').forEach(select => {
+      calendars.forEach(cal => {
+        const opt = document.createElement('option');
+        opt.value = cal.id;
+        opt.textContent = cal.summary;
+        select.appendChild(opt);
+      });
+    });
+  });
+</script>
 {% endblock %} 

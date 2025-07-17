@@ -81,4 +81,17 @@ class PDFService:
             
             return True
         except Exception:
-            return False 
+            return False
+
+def get_pdf_tasks():
+    service = PDFService()
+    pdfs = service.list_stored_pdfs()
+    tasks = []
+    for pdf in pdfs:
+        task = {
+            'title': pdf['filename'],
+            'description': str(pdf['metadata']),
+            'due_date': pdf['metadata'].get('due_date', '2024-12-31T12:00:00Z'),  # Placeholder or from metadata
+        }
+        tasks.append(task)
+    return tasks 

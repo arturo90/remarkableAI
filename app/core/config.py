@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Optional
+import os
 
 class Settings(BaseSettings):
     """Application settings."""
@@ -50,4 +51,14 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings() 
+    return Settings()
+
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+
+def get_google_oauth_config():
+    return {
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'redirect_uri': os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5000/oauth2callback')
+    } 

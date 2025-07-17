@@ -927,7 +927,7 @@ Focus on extracting actionable information and key insights from the handwritten
                         cleaned_task = cleaned_task.replace('[', '').replace(']', '')
                         
                         # Only add non-empty tasks
-                        if cleaned_task and len(cleaned_task.strip()) > 0:
+                        if cleaned_task and len(cleaned_task.strip()) > 3:
                             cleaned_tasks.append(cleaned_task.strip())
                 
                 cleaned_result['tasks'] = cleaned_tasks
