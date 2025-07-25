@@ -6,7 +6,12 @@
 <h2>Dashboard</h2>
 
 {% if not user_connected %}
-  <a href="/login" class="btn btn-primary">Connect Google Account</a>
+  <div class="auth-section" style="margin: 2em 0; text-align: center;">
+    <p>To get started, please connect your Google Account to enable PDF summarization and calendar integration.</p>
+    <a href="/login" class="btn btn-google" style="display: inline-flex; align-items: center; background: #fff; color: #444; border: 1px solid #ccc; border-radius: 4px; font-weight: 500; font-size: 1.1em; padding: 0.5em 1.5em; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: box-shadow 0.2s;">
+      <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo" style="width:24px; height:24px; margin-right: 0.5em;"> Sign in with Google
+    </a>
+  </div>
 {% else %}
   <p>Connected as {{ user_email }}</p>
   <a href="/logout" class="btn btn-secondary">Logout</a>

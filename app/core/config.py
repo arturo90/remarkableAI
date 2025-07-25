@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     MAX_RESULTS: int = 50
     RETENTION_DAYS: int = 30
     
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_REDIRECT_URI: str
+    SESSION_SECRET: str
+
     class Config:
         env_file = ".env"
         case_sensitive = True
