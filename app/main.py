@@ -122,9 +122,11 @@ async def results_page(request: Request):
 @app.get("/settings")
 async def settings_page(request: Request):
     """Settings page."""
+    auth_context = get_simple_auth_context()
+    print(f"Settings page - auth context: {auth_context}")  # Debug
     return templates.TemplateResponse("settings.html", {
         "request": request,
-        **get_simple_auth_context()
+        **auth_context
     })
 
 @app.get("/upload")
@@ -205,3 +207,123 @@ def test_cookie(request: Request, response: Response):
         "test_cookie_present": bool(test_cookie_value),
         "test_cookie_value": test_cookie_value
     } 
+
+@app.get("/gmail/auth-status")
+def gmail_auth_status():
+    """Check Gmail authentication status."""
+    print(f"Gmail auth status check - _tokens present: {bool(_tokens)}")  # Debug
+    print(f"User email: {_user_email}")  # Debug
+    
+    if _tokens:
+        return {
+            "status": "authenticated",
+            "email": _user_email,
+            "connected": True
+        }
+    else:
+        return {
+            "status": "not_authenticated",
+            "email": None,
+            "connected": False
+        }
+
+@app.get("/gmail/fetch-emails")
+def fetch_gmail_emails(max_results: int = 10):
+    """Fetch emails from Gmail using the authenticated tokens."""
+    global _tokens
+    if not _tokens:
+        return {"error": "Not authenticated", "emails": []}
+    
+    try:
+        # Use the global tokens to fetch emails
+        emails, new_tokens = gmail_api_get(f"users/me/messages?maxResults={max_results}", _tokens)
+        
+        # Update tokens if they were refreshed
+        if new_tokens != _tokens:
+            _tokens = new_tokens
+        
+        if emails and 'messages' in emails:
+            # Get details for each email
+            email_details = []
+            for message in emails['messages'][:max_results]:
+                try:
+                    detail, new_tokens = gmail_api_get(f"users/me/messages/{message['id']}", _tokens)
+                    if new_tokens != _tokens:
+                        _tokens = new_tokens
+                    
+                    if detail:
+                        email_details.append({
+                            'id': message['id'],
+                            'subject': detail.get('payload', {}).get('headers', []),
+                            'snippet': detail.get('snippet', ''),
+                            'internalDate': detail.get('internalDate', '')
+                        })
+                except Exception as e:
+                    print(f"Error fetching email {message['id']}: {e}")
+                    continue
+            
+            return {
+                "status": "success",
+                "emails": email_details,
+                "total": len(email_details)
+            }
+        else:
+            return {
+                "status": "success",
+                "emails": [],
+                "total": 0
+            }
+            
+    except Exception as e:
+        print(f"Error fetching emails: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "emails": []
+        } 
+
+@app.get("/gmail/test")
+def test_gmail_connection():
+    """Test Gmail API connection and show user profile."""
+    global _tokens
+    if not _tokens:
+        return {
+            "status": "error",
+            "message": "Not authenticated with Google",
+            "authenticated": False
+        }
+    
+    try:
+        # Test by getting user profile
+        profile, new_tokens = gmail_api_get("users/me/profile", _tokens)
+        
+        # Update tokens if they were refreshed
+        if new_tokens != _tokens:
+            _tokens = new_tokens
+        
+        if profile:
+            return {
+                "status": "success",
+                "message": "Gmail API connection successful",
+                "authenticated": True,
+                "profile": {
+                    "email": profile.get('emailAddress'),
+                    "name": profile.get('name'),
+                    "messagesTotal": profile.get('messagesTotal'),
+                    "threadsTotal": profile.get('threadsTotal')
+                }
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Could not fetch user profile",
+                "authenticated": True
+            }
+            
+    except Exception as e:
+        print(f"Error testing Gmail connection: {e}")
+        return {
+            "status": "error",
+            "message": f"Gmail API error: {str(e)}",
+            "authenticated": True
+        } 
