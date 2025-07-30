@@ -3,33 +3,355 @@
 {% block title %}Dashboard - RemarkableAI{% endblock %}
 
 {% block content %}
-<h2>Dashboard</h2>
+<div class="dashboard-container">
+    {% if not user_connected %}
+        <!-- Authentication Section -->
+        <div class="auth-section">
+            <div class="auth-card">
+                <div class="auth-icon-large">
+                    <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" style="width: 48px; height: 48px;">
+                </div>
+                <h1>Welcome to RemarkableAI</h1>
+                <p class="auth-description">
+                    Connect your Google account to unlock powerful PDF processing and calendar integration features.
+                </p>
+                <a href="/login" class="google-signin-btn">
+                    <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo" style="width: 20px; height: 20px; margin-right: 8px;">
+                    Sign in with Google
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <!-- Authenticated Dashboard -->
+        <div class="dashboard-header">
+            <div class="user-welcome">
+                <div class="user-avatar">
+                    <span>{{ user_email[0].upper() }}</span>
+                </div>
+                <div class="user-info">
+                    <h1>Welcome back!</h1>
+                    <p>Signed in as {{ user_email }}</p>
+                </div>
+            </div>
+            <div class="user-actions">
+                <a href="/logout" class="logout-btn">Sign Out</a>
+            </div>
+        </div>
 
-{% if not user_connected %}
-  <div class="auth-section" style="margin: 2em 0; text-align: center;">
-    <p>To get started, please connect your Google Account to enable PDF summarization and calendar integration.</p>
-    <a href="/login" class="btn btn-google" style="display: inline-flex; align-items: center; background: #fff; color: #444; border: 1px solid #ccc; border-radius: 4px; font-weight: 500; font-size: 1.1em; padding: 0.5em 1.5em; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: box-shadow 0.2s;">
-      <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo" style="width:24px; height:24px; margin-right: 0.5em;"> Sign in with Google
-    </a>
-  </div>
-{% else %}
-  <p>Connected as {{ user_email }}</p>
-  <a href="/logout" class="btn btn-secondary">Logout</a>
-{% endif %}
+        <div class="dashboard-grid">
+            <!-- PDF Processing Section -->
+            <div class="feature-card">
+                <div class="card-header">
+                    <div class="card-icon">📄</div>
+                    <h3>PDF Processing</h3>
+                </div>
+                <p>Upload and process your Remarkable notes with AI-powered analysis.</p>
+                <div class="card-actions">
+                    <a href="/upload" class="btn-primary">Upload PDF</a>
+                    <a href="/pdfs" class="btn-secondary">View PDFs</a>
+                </div>
+            </div>
 
-{% if user_connected and not calendar_connected %}
-  <a href="/calendar/connect" class="btn btn-success">Connect Google Calendar</a>
-{% endif %}
+            <!-- Results Section -->
+            <div class="feature-card">
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <h3>Results & Analytics</h3>
+                </div>
+                <p>View processed results and insights from your uploaded documents.</p>
+                <div class="card-actions">
+                    <a href="/results" class="btn-primary">View Results</a>
+                </div>
+            </div>
 
-<!-- Add links to PDF tasks and calendar list for convenience -->
-{% if user_connected %}
-  <p><a href="/pdf_tasks">View PDF Tasks</a> | <a href="/calendar/list">View My Calendars</a></p>
-{% endif %}
+            <!-- Calendar Integration -->
+            <div class="feature-card">
+                <div class="card-header">
+                    <div class="card-icon">📅</div>
+                    <h3>Calendar Integration</h3>
+                </div>
+                <p>Add tasks and events from your PDFs directly to your Google Calendar.</p>
+                <div class="card-actions">
+                    {% if not calendar_connected %}
+                        <a href="/calendar/connect" class="btn-primary">Connect Calendar</a>
+                    {% else %}
+                        <a href="/calendar/list" class="btn-primary">View Calendars</a>
+                        <a href="/pdf_tasks" class="btn-secondary">Add Tasks</a>
+                    {% endif %}
+                </div>
+            </div>
 
-<!--
-Context variables needed:
-- user_connected: bool (True if user is authenticated with Google)
-- user_email: str (user's email, if connected)
-- calendar_connected: bool (True if calendar scope is authorized)
--->
+            <!-- Settings -->
+            <div class="feature-card">
+                <div class="card-header">
+                    <div class="card-icon">⚙️</div>
+                    <h3>Settings</h3>
+                </div>
+                <p>Configure your preferences and manage your account settings.</p>
+                <div class="card-actions">
+                    <a href="/settings" class="btn-secondary">Open Settings</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="stats-section">
+            <div class="stat-card">
+                <div class="stat-number">0</div>
+                <div class="stat-label">PDFs Processed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">0</div>
+                <div class="stat-label">Tasks Created</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">0</div>
+                <div class="stat-label">Calendar Events</div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Authentication Section */
+.auth-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+}
+
+.auth-card {
+    background: white;
+    padding: 3rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    max-width: 400px;
+}
+
+.auth-icon-large {
+    margin-bottom: 1.5rem;
+}
+
+.auth-card h1 {
+    color: #333;
+    margin-bottom: 1rem;
+    font-size: 1.8rem;
+}
+
+.auth-description {
+    color: #666;
+    margin-bottom: 2rem;
+    line-height: 1.6;
+}
+
+.google-signin-btn {
+    display: inline-flex;
+    align-items: center;
+    background: #fff;
+    color: #444;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 1rem;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.google-signin-btn:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+/* Dashboard Header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.user-welcome {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-avatar {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.user-info h1 {
+    margin: 0;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+.user-info p {
+    margin: 0.25rem 0 0 0;
+    color: #666;
+}
+
+.logout-btn {
+    background: #dc3545;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.logout-btn:hover {
+    background: #c82333;
+}
+
+/* Feature Grid */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.feature-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.card-icon {
+    font-size: 1.5rem;
+}
+
+.card-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.feature-card p {
+    color: #666;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.card-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+/* Stats Section */
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 1rem;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-section {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+}
+</style>
 {% endblock %} 

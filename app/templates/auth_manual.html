@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Authentication Debug - RemarkableAI{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin: 4em 0;">
+    <h1>Authentication Debug</h1>
+    
+    <div style="background: #f0f0f0; padding: 1em; margin: 2em 0; border-radius: 4px; text-align: left;">
+        <h3>Debug Information:</h3>
+        <p><strong>User Connected:</strong> {{ user_connected }}</p>
+        <p><strong>User Email:</strong> {{ user_email or "Not set" }}</p>
+        <p><strong>Calendar Connected:</strong> {{ calendar_connected }}</p>
+    </div>
+    
+    <p style="margin: 2em 0; font-size: 1.2em; color: #ff6b6b;">
+        ⚠️ Cookie-based authentication is not working. This might be due to browser security settings.
+    </p>
+    
+    <div style="margin: 2em 0;">
+        <a href="/test-cookie" class="btn" style="display: inline-block; background: #007bff; color: white; padding: 0.75em 1.5em; text-decoration: none; border-radius: 4px; font-weight: 500; margin: 0.5em;">
+            Test Cookie Functionality
+        </a>
+        <a href="/auth" class="btn" style="display: inline-block; background: #28a745; color: white; padding: 0.75em 1.5em; text-decoration: none; border-radius: 4px; font-weight: 500; margin: 0.5em;">
+            Try Authentication Again
+        </a>
+    </div>
+    
+    <p style="color: #666; font-size: 0.9em;">
+        If cookies are not working, you may need to:
+        <br>1. Check browser security settings
+        <br>2. Try a different browser
+        <br>3. Disable browser extensions that block cookies
+    </p>
+</div>
+{% endblock %} 

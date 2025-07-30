@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - RemarkableAI{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin: 4em 0;">
+    <h1>Welcome to RemarkableAI</h1>
+    <p style="margin: 2em 0; font-size: 1.2em;">
+        To use our PDF processing and calendar integration features, please sign in with your Google account.
+    </p>
+    
+    <div class="auth-section" style="margin: 2em 0;">
+        <a href="/login" class="btn btn-google" style="display: inline-flex; align-items: center; background: #fff; color: #444; border: 1px solid #ccc; border-radius: 4px; font-weight: 500; font-size: 1.1em; padding: 0.5em 1.5em; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: box-shadow 0.2s; text-decoration: none;">
+            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo" style="width:24px; height:24px; margin-right: 0.5em;"> Sign in with Google
+        </a>
+    </div>
+    
+    <p style="color: #666; font-size: 0.9em;">
+        We'll request access to your Gmail and Google Calendar to enable our features.
+    </p>
+</div>
+{% endblock %} 

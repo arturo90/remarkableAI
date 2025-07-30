@@ -10,10 +10,10 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
     
-    # Gmail API
-    GMAIL_CLIENT_ID: str = ""
-    GMAIL_CLIENT_SECRET: str = ""
-    GMAIL_REDIRECT_URI: str = "http://localhost:8000/gmail/callback"
+    # Google OAuth Configuration
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_REDIRECT_URI: str = "http://127.0.0.1:8000/auth/callback"
     
     # AI Processing
     AI_PROVIDER: str = "local"  # Options: "local", "openai", "multimodal", "openai_multimodal"
@@ -44,9 +44,6 @@ class Settings(BaseSettings):
     MAX_RESULTS: int = 50
     RETENTION_DAYS: int = 30
     
-    GOOGLE_CLIENT_ID: str
-    GOOGLE_CLIENT_SECRET: str
-    GOOGLE_REDIRECT_URI: str
     SESSION_SECRET: str
 
     class Config:
@@ -58,12 +55,10 @@ def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
 
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-
 def get_google_oauth_config():
+    settings = get_settings()
     return {
-        'client_id': GOOGLE_CLIENT_ID,
-        'client_secret': GOOGLE_CLIENT_SECRET,
-        'redirect_uri': os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5000/oauth2callback')
+        'client_id': settings.GOOGLE_CLIENT_ID,
+        'client_secret': settings.GOOGLE_CLIENT_SECRET,
+        'redirect_uri': settings.GOOGLE_REDIRECT_URI
     } 
