@@ -324,11 +324,7 @@ function renderNotes() {
                                 <div id="processing-dropdown-${note.metadata.message_id}-${note.metadata.attachment_id}" 
                                      class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 hidden z-10">
                                     <div class="py-1">
-                                        <button onclick="processNote('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
-                                                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                                            <i class="fas fa-robot mr-2 text-blue-600"></i>
-                                            Local Multimodal (LLaVA)
-                                        </button>
+
                                         <button onclick="processNoteWithOpenAI('${note.metadata.message_id}', '${note.metadata.attachment_id}')" 
                                                 class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
                                             <i class="fas fa-eye mr-2 text-purple-600"></i>
@@ -455,67 +451,7 @@ async function viewNote(messageId, attachmentId) {
     }
 }
 
-// Process note
-async function processNote(messageId, attachmentId) {
-    try {
-        // Find the note to get its filename
-        const note = allNotes.find(n => n.metadata.message_id === messageId && n.metadata.attachment_id === attachmentId);
-        const filename = note?.metadata?.filename || note?.metadata?.original_filename || 'Unknown Document';
-        
-        // Show progress for single note
-        processingQueue = [{
-            messageId: messageId,
-            attachmentId: attachmentId,
-            filename: filename,
-            status: 'processing',
-            error: null
-        }];
-        
-        showProgressModal();
-        updateProgressUI();
-        
-        const response = await fetch(`/gmail/local/process-with-multimodal/${messageId}/${attachmentId}`, {
-            method: 'POST'
-        });
-        
-        if (response.ok) {
-            processingQueue[0].status = 'completed';
-            updateProgressUI();
-            
-            // Wait a moment to show completion
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            hideProgressModal();
-            showNotification('Note processed successfully!', 'success');
-            await loadNotes(); // Refresh the list
-        } else {
-            const errorData = await response.json().catch(() => ({}));
-            processingQueue[0].status = 'failed';
-            processingQueue[0].error = errorData.detail || 'Processing failed';
-            updateProgressUI();
-            
-            // Wait a moment to show error
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            hideProgressModal();
-            showNotification('Error processing note', 'error');
-        }
-    } catch (error) {
-        console.error('Error processing note:', error);
-        
-        if (processingQueue.length > 0) {
-            processingQueue[0].status = 'failed';
-            processingQueue[0].error = error.message;
-            updateProgressUI();
-            
-            // Wait a moment to show error
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            hideProgressModal();
-        }
-        
-        showNotification('Error processing note', 'error');
-    }
-}
+
 
 // Process note with OpenAI multimodal
 async function processNoteWithOpenAI(messageId, attachmentId) {
@@ -727,7 +663,7 @@ async function processMultipleNotes() {
 
 // Process a single note
 async function processSingleNote(messageId, attachmentId) {
-    const response = await fetch(`/gmail/local/process-with-multimodal/${messageId}/${attachmentId}`, {
+    const response = await fetch(`/gmail/local/process-with-openai-multimodal/${messageId}/${attachmentId}`, {
         method: 'POST'
     });
     

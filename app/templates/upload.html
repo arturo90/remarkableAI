@@ -35,30 +35,16 @@
             </div>
         </div>
 
-        <!-- Processing Options -->
+        <!-- Processing Information -->
         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
-            <h3 class="text-xl font-semibold text-gray-900 mb-6">Processing Options</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="flex items-start p-6 border border-gray-200 rounded-xl hover:border-blue-300 transition-colors">
-                    <input type="radio" id="standardAI" name="processingType" value="standard" class="mr-4 mt-1" checked>
-                    <div>
-                        <label for="standardAI" class="font-semibold text-gray-900 text-lg">Standard AI Processing</label>
-                        <p class="text-sm text-gray-600 mt-2">Uses OCR + AI for text extraction and analysis</p>
-                    </div>
+            <h3 class="text-xl font-semibold text-gray-900 mb-6">Processing Information</h3>
+            <div class="flex items-start p-6 border border-blue-200 rounded-xl bg-blue-50">
+                <div class="mr-4">
+                    <i class="fas fa-eye text-2xl text-blue-600"></i>
                 </div>
-                <div class="flex items-start p-6 border border-gray-200 rounded-xl hover:border-blue-300 transition-colors">
-                    <input type="radio" id="multimodalAI" name="processingType" value="multimodal" class="mr-4 mt-1">
-                    <div>
-                        <label for="multimodalAI" class="font-semibold text-gray-900 text-lg">Local Multimodal LLM</label>
-                        <p class="text-sm text-gray-600 mt-2">Uses LLaVA for superior handwritten text recognition</p>
-                    </div>
-                </div>
-                <div class="flex items-start p-6 border border-gray-200 rounded-xl hover:border-blue-300 transition-colors">
-                    <input type="radio" id="openaiMultimodalAI" name="processingType" value="openai_multimodal" class="mr-4 mt-1">
-                    <div>
-                        <label for="openaiMultimodalAI" class="font-semibold text-gray-900 text-lg">OpenAI Multimodal</label>
-                        <p class="text-sm text-gray-600 mt-2">Uses GPT-4 Vision for superior handwritten text recognition</p>
-                    </div>
+                <div>
+                    <h4 class="font-semibold text-gray-900 text-lg">OpenAI Multimodal Processing</h4>
+                    <p class="text-sm text-gray-600 mt-2">All PDFs are processed using GPT-4 Vision for optimal handwritten text recognition and analysis</p>
                 </div>
             </div>
         </div>
@@ -196,14 +182,8 @@
             const formData = new FormData();
             formData.append('file', currentFile);
             
-            const processingType = document.querySelector('input[name="processingType"]:checked').value;
-            let endpoint = '/gmail/upload-pdf'; // default
-            
-            if (processingType === 'multimodal') {
-                endpoint = '/gmail/upload-pdf-multimodal';
-            } else if (processingType === 'openai_multimodal') {
-                endpoint = '/gmail/upload-pdf-openai-multimodal';
-            }
+            // Always use OpenAI multimodal processing for optimal PDF reading
+            const endpoint = '/gmail/upload-pdf';
             
             updateProgress(20, 'Uploading file...');
             
@@ -217,7 +197,7 @@
                 throw new Error(error.detail || 'Upload failed');
             }
             
-            updateProgress(50, 'Processing with AI...');
+            updateProgress(50, 'Processing with OpenAI multimodal AI...');
             
             const result = await response.json();
             

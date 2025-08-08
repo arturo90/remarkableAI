@@ -7,11 +7,8 @@ An intelligent note processing system that automatically analyzes and organizes 
 ### Core Functionality
 - **Gmail Integration**: Automatic PDF sync from Gmail attachments
 - **AI-Powered Analysis**: Extract tasks, summaries, topics, and dates from handwritten notes
-- **Multiple AI Providers**: Support for local processing, OpenAI, and multimodal LLM
-- **OCR Processing**: Advanced text extraction with EasyOCR and Tesseract
-- **Multimodal LLM Processing**: Direct image-to-text processing using Ollama + LLaVA for superior handwritten text recognition
 - **OpenAI Multimodal Processing**: Direct image-to-text processing using GPT-4 Vision for superior handwritten text recognition
-- **Local & Cloud AI**: Support for both local rule-based and OpenAI processing
+- **PDF Processing**: Advanced PDF processing with OpenAI multimodal capabilities
 
 ### Web Interface (v1.1.0)
 - **Enhanced Dashboard**: Real-time statistics and quick actions
@@ -32,10 +29,8 @@ An intelligent note processing system that automatically analyzes and organizes 
 
 - Python 3.9+
 - Gmail account with API access
-- EasyOCR (for advanced handwritten text processing)
-- Tesseract OCR (fallback for text processing)
-- Ollama + LLaVA (for multimodal LLM processing)
-- OpenAI API key (optional, for advanced AI processing)
+- OpenAI API key (for AI processing)
+- pdf2image (for PDF to image conversion)
 
 ## 🛠️ Installation
 
@@ -58,12 +53,8 @@ pip install -r requirements.txt
 
 4. **Install system dependencies** (macOS):
 ```bash
-brew install tesseract
 brew install poppler
-brew install ollama
 ```
-
-**Note**: EasyOCR is automatically installed via pip and provides significantly better handwritten text recognition than Tesseract alone.
 
 5. **Set up environment variables**:
 ```bash
@@ -71,17 +62,8 @@ cp .env.example .env
 # Edit .env with your configuration:
 # - GMAIL_CLIENT_ID
 # - GMAIL_CLIENT_SECRET
-# - OPENAI_API_KEY (optional)
-# - AI_PROVIDER=multimodal (or local, openai)
-```
-
-6. **Set up Ollama and LLaVA**:
-```bash
-# Start Ollama service
-brew services start ollama
-
-# Pull the LLaVA model (this may take several minutes)
-ollama pull llava
+# - OPENAI_API_KEY
+# - AI_PROVIDER=openai_multimodal (or openai)
 ```
 
 7. **Start the application**:
@@ -128,11 +110,11 @@ GMAIL_CLIENT_ID=your_gmail_client_id
 GMAIL_CLIENT_SECRET=your_gmail_client_secret
 
 # AI Configuration
-AI_PROVIDER=multimodal  # Options: local, openai, multimodal, openai_multimodal
-OPENAI_API_KEY=your_openai_api_key  # required for openai and openai_multimodal
+AI_PROVIDER=openai_multimodal  # Options: openai, openai_multimodal
+OPENAI_API_KEY=your_openai_api_key  # required for AI processing
 
 # Processing Configuration
-OCR_ENABLED=true
+
 AUTO_SYNC=false
 AUTO_PROCESS=false
 ```
@@ -147,17 +129,13 @@ AUTO_PROCESS=false
 
 ### AI Providers
 
-The application supports multiple AI providers for processing handwritten notes:
+The application supports OpenAI-based AI providers for processing handwritten notes:
 
-- **local**: Rule-based processing with OCR extraction (free, no API key required)
 - **openai**: Text-based processing using OpenAI's GPT models (requires OpenAI API key)
-- **multimodal**: Local multimodal processing using Ollama + LLaVA (requires Ollama setup)
 - **openai_multimodal**: Cloud-based multimodal processing using GPT-4 Vision (requires OpenAI API key)
 
 **Recommendations:**
-- Use **local** for basic processing without external dependencies
 - Use **openai** for high-quality text analysis (requires API key)
-- Use **multimodal** for superior handwritten text recognition (requires Ollama + LLaVA)
 - Use **openai_multimodal** for the best handwritten text recognition (requires OpenAI API key)
 
 ## 🧪 Testing

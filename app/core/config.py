@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://127.0.0.1:8000/auth/callback"
     
     # AI Processing
-    AI_PROVIDER: str = "local"  # Options: "local", "openai", "multimodal", "openai_multimodal"
+    AI_PROVIDER: str = "openai_multimodal"  # Always use multimodal for optimal PDF reading
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-3.5-turbo"
+    OPENAI_MODEL: str = "gpt-4-vision-preview"  # OpenAI multimodal model for PDF processing
     
     # Database
     DATABASE_URL: str = "sqlite:///./remarkable_ai.db"
@@ -38,7 +38,6 @@ class Settings(BaseSettings):
     RESULTS_PATH: str = "storage/results"
     
     # Processing Configuration
-    OCR_ENABLED: bool = True
     AUTO_SYNC: bool = False
     AUTO_PROCESS: bool = False
     MAX_RESULTS: int = 50
