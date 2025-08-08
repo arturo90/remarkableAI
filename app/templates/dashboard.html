@@ -39,6 +39,19 @@
         </div>
 
         <div class="dashboard-grid">
+            <!-- Gmail Sync Section -->
+            <div class="feature-card">
+                <div class="card-header">
+                    <div class="card-icon">📧</div>
+                    <h3>Gmail Sync</h3>
+                </div>
+                <p>Sync PDF attachments from your Gmail account using your configured email filter.</p>
+                <div class="card-actions">
+                    <button onclick="syncFromGmail()" class="btn-primary">Sync from Gmail</button>
+                    <a href="/settings" class="btn-secondary">Configure Filter</a>
+                </div>
+            </div>
+
             <!-- PDF Processing Section -->
             <div class="feature-card">
                 <div class="card-header">
@@ -111,6 +124,52 @@
         </div>
     {% endif %}
 </div>
+
+<script>
+// Function to sync from Gmail
+async function syncFromGmail() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing...';
+        button.disabled = true;
+        
+        // Get email filter from settings
+        const emailFilter = localStorage.getItem('email-filter') || '';
+        const maxResults = localStorage.getItem('max-results') || '50';
+        
+        // Build the request URL with parameters
+        const params = new URLSearchParams({
+            max_results: maxResults
+        });
+        
+        if (emailFilter.trim()) {
+            params.append('email_filter', emailFilter.trim());
+        }
+        
+        const response = await fetch(`/gmail/sync-pdfs?${params.toString()}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert(`Successfully synced ${result.synced_count} PDFs from Gmail!`);
+            // Redirect to PDFs page to see the synced files
+            window.location.href = '/pdfs';
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            alert(`Error syncing from Gmail: ${errorData.detail || response.statusText}`);
+        }
+    } catch (error) {
+        console.error('Error syncing from Gmail:', error);
+        alert('Error syncing from Gmail');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+</script>
 
 <style>
 .dashboard-container {

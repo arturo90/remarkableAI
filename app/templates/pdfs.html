@@ -13,6 +13,9 @@
                     <p class="text-gray-600">Browse your handwritten notes and verify AI extraction accuracy</p>
                 </div>
                 <div class="flex space-x-3">
+                    <button onclick="syncNotesFromGmail()" class="bg-purple-600 text-white px-6 py-3 rounded-xl hover:bg-purple-700 transition-colors font-semibold">
+                        <i class="fas fa-sync-alt mr-2"></i>Sync from Gmail
+                    </button>
                     <button onclick="refreshNotes()" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
                         <i class="fas fa-refresh mr-2"></i>Refresh
                     </button>
@@ -112,9 +115,9 @@
                 <i class="fas fa-file-pdf text-6xl text-gray-300 mb-6"></i>
                 <h3 class="text-xl font-semibold text-gray-900 mb-2">No notes found</h3>
                 <p class="text-gray-600 mb-6">Sync your notes from Gmail to get started</p>
-                <a href="/" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
+                <button onclick="syncNotesFromGmail()" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold">
                     <i class="fas fa-sync-alt mr-2"></i>Sync Notes
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -823,6 +826,49 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add cancel button event listener
     document.getElementById('cancel-processing').addEventListener('click', cancelProcessing);
 });
+
+// Function to sync notes from Gmail
+async function syncNotesFromGmail() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing...';
+        button.disabled = true;
+        
+        // Get email filter from settings
+        const emailFilter = localStorage.getItem('email-filter') || '';
+        const maxResults = localStorage.getItem('max-results') || '50';
+        
+        // Build the request URL with parameters
+        const params = new URLSearchParams({
+            max_results: maxResults
+        });
+        
+        if (emailFilter.trim()) {
+            params.append('email_filter', emailFilter.trim());
+        }
+        
+        const response = await fetch(`/gmail/sync-pdfs?${params.toString()}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification(`Successfully synced ${result.synced_count} notes from Gmail!`, 'success');
+            await loadNotes(); // Refresh the list
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            showNotification(`Error syncing notes: ${errorData.detail || response.statusText}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error syncing notes:', error);
+        showNotification('Error syncing notes', 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
 </script>
 
 <h2>PDF Tasks</h2>

@@ -15,76 +15,86 @@ import hashlib
 import requests
 import time
 
+# Constants for token-based authentication
+GOOGLE_AUTH_BASE = 'https://accounts.google.com/o/oauth2/auth'
+GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+GOOGLE_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me/'
+GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3/'
+
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar']
+
 class GmailService:
-    """Service for interacting with Gmail API."""
-    
-    SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+    """Service for interacting with Gmail API using token-based authentication."""
     
     def __init__(self):
         self.settings = get_settings()
-        self.credentials = None
-        self.service = None
-        self.token_path = Path("token.pickle")
-        self.credentials_path = Path("credentials.json")
         self.pdf_service = PDFService()
         self.ai_processor = AIProcessor()
+        self._tokens = None
+    
+    def set_tokens(self, tokens: Dict[str, Any]):
+        """Set the authentication tokens for this service instance."""
+        self._tokens = tokens
+    
+    def get_tokens(self) -> Optional[Dict[str, Any]]:
+        """Get the current authentication tokens."""
+        return self._tokens
     
     def authenticate(self) -> bool:
-        """Authenticate with Gmail API."""
-        if not self.credentials_path.exists():
+        """Check if we have valid tokens for authentication."""
+        if not self._tokens:
             raise HTTPException(
-                status_code=400,
-                detail="Gmail credentials not found. Please set up credentials.json"
+                status_code=401,
+                detail="No authentication tokens available. Please authenticate first."
             )
         
-        try:
-            if self.token_path.exists():
-                with open(self.token_path, 'rb') as token:
-                    self.credentials = pickle.load(token)
-            
-            if not self.credentials or not self.credentials.valid:
-                if self.credentials and self.credentials.expired and self.credentials.refresh_token:
-                    self.credentials.refresh(Request())
-                else:
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        str(self.credentials_path),
-                        self.SCOPES
-                    )
-                    self.credentials = flow.run_local_server(port=0)
-                
-                with open(self.token_path, 'wb') as token:
-                    pickle.dump(self.credentials, token)
-            
-            self.service = build('gmail', 'v1', credentials=self.credentials)
-            return True
-        except Exception as e:
+        # Check if tokens are valid
+        access_token, self._tokens = get_access_token(self._tokens)
+        if not access_token:
             raise HTTPException(
-                status_code=500,
-                detail=f"Failed to authenticate with Gmail: {str(e)}"
+                status_code=401,
+                detail="Authentication tokens are invalid or expired. Please re-authenticate."
             )
+        
+        return True
     
-    def get_pdf_attachments(self, max_results: int = 10) -> List[Dict[str, Any]]:
-        """Fetch PDF attachments from Gmail, only from my@remarkable.com."""
+    def get_pdf_attachments(self, max_results: int = 10, email_filter: str = None) -> List[Dict[str, Any]]:
+        """Fetch PDF attachments from Gmail using the specified email filter."""
         try:
-            if not self.service:
-                self.authenticate()
+            # Ensure we're authenticated
+            self.authenticate()
             
-            # Search for emails with PDF attachments from a specific sender
-            query = 'from:my@remarkable.com has:attachment filename:pdf'
-            results = self.service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=max_results
-            ).execute()
+            # Build the search query
+            if email_filter and email_filter.strip():
+                # Use the custom email filter if provided
+                query = f'{email_filter.strip()} has:attachment filename:pdf'
+            else:
+                # More flexible default filter - look for any PDF attachments
+                query = 'has:attachment filename:pdf'
             
-            messages = results.get('messages', [])
+            print(f"[DEBUG] Using Gmail query: {query}")
+            
+            # Use the token-based API call
+            endpoint = f"messages?q={query}&maxResults={max_results}"
+            response, self._tokens = gmail_api_get(endpoint, self._tokens)
+            
+            if not response or 'messages' not in response:
+                print("[DEBUG] No messages found")
+                return []
+            
+            messages = response['messages']
             pdf_attachments = []
             
             for message in messages:
-                msg = self.service.users().messages().get(
-                    userId='me',
-                    id=message['id']
-                ).execute()
+                # Get message details
+                msg_endpoint = f"messages/{message['id']}"
+                msg_response, self._tokens = gmail_api_get(msg_endpoint, self._tokens)
+                
+                if not msg_response or 'payload' not in msg_response:
+                    continue
+                
+                msg = msg_response
                 
                 if 'parts' in msg['payload']:
                     for part in msg['payload']['parts']:
@@ -102,67 +112,93 @@ class GmailService:
                             }
                             pdf_attachments.append(attachment)
             
+            print(f"[DEBUG] Found {len(pdf_attachments)} PDF attachments")
             return pdf_attachments
         except Exception as e:
+            print(f"[ERROR] Failed to fetch PDF attachments: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to fetch PDF attachments: {str(e)}"
             )
     
+    def download_attachment(self, message_id: str, attachment_id: str) -> Dict[str, Any]:
+        """Download a PDF attachment using token-based authentication."""
+        try:
+            # Ensure we're authenticated
+            self.authenticate()
+            
+            # Download the attachment using token-based API
+            endpoint = f"messages/{message_id}/attachments/{attachment_id}"
+            attachment_response, self._tokens = gmail_api_get(endpoint, self._tokens)
+            
+            if not attachment_response or 'data' not in attachment_response:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Attachment not found"
+                )
+            
+            # Get message details for metadata
+            msg_endpoint = f"messages/{message_id}"
+            msg_response, self._tokens = gmail_api_get(msg_endpoint, self._tokens)
+            
+            if not msg_response:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Message not found"
+                )
+            
+            metadata = {
+                'message_id': message_id,
+                'attachment_id': attachment_id,
+                'subject': next(
+                    (header['value'] for header in msg_response['payload']['headers'] 
+                     if header['name'].lower() == 'subject'),
+                    'No Subject'
+                ),
+                'date': msg_response['internalDate'],
+                'from': next(
+                    (header['value'] for header in msg_response['payload']['headers'] 
+                     if header['name'].lower() == 'from'),
+                    'Unknown'
+                )
+            }
+            
+            return {
+                'data': attachment_response['data'],
+                'metadata': metadata
+            }
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to download attachment: {str(e)}"
+            )
+    
     def download_and_store_pdf(self, message_id: str, attachment_id: str) -> Dict[str, Any]:
         """Download a PDF attachment and store it locally."""
         try:
-            if not self.service:
-                self.authenticate()
-            
             # Download the attachment
-            attachment = self.service.users().messages().attachments().get(
-                userId='me',
-                messageId=message_id,
-                id=attachment_id
-            ).execute()
+            attachment_data = self.download_attachment(message_id, attachment_id)
             
-            if not attachment or 'data' not in attachment:
+            if not attachment_data or 'data' not in attachment_data:
                 raise HTTPException(
                     status_code=404,
                     detail="Attachment not found"
                 )
             
             # Decode the attachment data
-            pdf_data = base64.urlsafe_b64decode(attachment['data'])
-            
-            # Get message details for metadata
-            msg = self.service.users().messages().get(
-                userId='me',
-                id=message_id
-            ).execute()
-            
-            metadata = {
-                'message_id': message_id,
-                'attachment_id': attachment_id,
-                'subject': next(
-                    (header['value'] for header in msg['payload']['headers'] 
-                     if header['name'].lower() == 'subject'),
-                    'No Subject'
-                ),
-                'date': msg['internalDate'],
-                'from': next(
-                    (header['value'] for header in msg['payload']['headers'] 
-                     if header['name'].lower() == 'from'),
-                    'Unknown'
-                )
-            }
+            pdf_data = base64.urlsafe_b64decode(attachment_data['data'])
             
             # Store the PDF locally
             stored_path = self.pdf_service.store_pdf(
                 pdf_data, 
-                metadata['subject'] + '.pdf',
-                metadata
+                attachment_data['metadata']['subject'] + '.pdf',
+                attachment_data['metadata']
             )
             
             return {
                 'stored_path': stored_path,
-                'metadata': metadata,
+                'metadata': attachment_data['metadata'],
                 'size_bytes': len(pdf_data)
             }
             
@@ -193,114 +229,46 @@ class GmailService:
                 detail=f"Failed to process PDF with AI: {str(e)}"
             )
     
-    def download_attachment(self, message_id: str, attachment_id: str) -> Dict[str, Any]:
-        """Download a specific attachment."""
-        try:
-            if not self.service:
-                self.authenticate()
-            
-            attachment = self.service.users().messages().attachments().get(
-                userId='me',
-                messageId=message_id,
-                id=attachment_id
-            ).execute()
-            
-            if not attachment or 'data' not in attachment:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Attachment not found"
-                )
-            
-            return {
-                'data': attachment['data'],
-                'content_type': 'application/pdf'
-            }
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to download attachment: {str(e)}"
-            )
-    
     def get_attachment_path(self, message_id: str, attachment_id: str) -> Optional[str]:
-        """Get the stored path of a downloaded PDF attachment."""
+        """Get the local file path of a stored attachment."""
         try:
-            # Check if the PDF was already downloaded and stored
-            storage_dir = Path("storage/pdfs")
-            if not storage_dir.exists():
-                return None
+            # Create a hash-based filename
+            file_hash = self._get_attachment_hash(attachment_id)
+            storage_path = Path(self.settings.PDFS_PATH)
             
-            # Look for files with matching metadata
-            for pdf_file in storage_dir.glob("*.pdf"):
-                metadata_file = pdf_file.with_suffix('.json')
-                if metadata_file.exists():
-                    try:
-                        import json
-                        with open(metadata_file, 'r') as f:
-                            metadata = json.load(f)
-                        
-                        if (metadata.get('message_id') == message_id and 
-                            metadata.get('attachment_id') == attachment_id):
-                            return str(pdf_file)
-                    except Exception:
-                        continue
+            # Look for files with this hash
+            for pdf_file in storage_path.glob("*.pdf"):
+                if file_hash in pdf_file.name:
+                    return str(pdf_file)
             
             return None
-        except Exception as e:
-            print(f"Error getting attachment path: {str(e)}")
+        except Exception:
             return None
     
     def store_ai_result(self, message_id: str, attachment_id: str, result: Dict[str, Any]) -> None:
-        """Store AI analysis result for an attachment."""
+        """Store AI processing results for an attachment."""
         try:
-            import json
-            from datetime import datetime
-            
-            # Create results directory if it doesn't exist
+            # Create results directory
             results_dir = Path("storage/results")
             results_dir.mkdir(parents=True, exist_ok=True)
             
-            # Create a shorter filename using hash of attachment_id
-            attachment_hash = hashlib.md5(attachment_id.encode()).hexdigest()[:8]
-            result_filename = f"{message_id}_{attachment_hash}_ai_result.json"
+            # Create a unique filename for the result
+            result_filename = f"{message_id}_{attachment_id}_result.json"
             result_path = results_dir / result_filename
             
-            # Add metadata to result
-            result_with_metadata = {
-                "message_id": message_id,
-                "attachment_id": attachment_id,
-                "attachment_hash": attachment_hash,
-                "processed_at": datetime.now().isoformat(),
-                "result": result
-            }
-            
-            # Save result
+            # Store the result
+            import json
             with open(result_path, 'w') as f:
-                json.dump(result_with_metadata, f, indent=2)
+                json.dump(result, f, indent=2)
                 
-            print(f"AI result stored at: {result_path}")
-            
         except Exception as e:
-            print(f"Failed to store AI result: {str(e)}")
+            print(f"Failed to store AI result: {e}")
     
     def _get_attachment_hash(self, attachment_id: str) -> str:
-        """Get a short hash of the attachment ID for filename generation."""
+        """Generate a hash for the attachment ID."""
         return hashlib.md5(attachment_id.encode()).hexdigest()[:8]
 
-GOOGLE_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth'
-GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-GOOGLE_API_BASE = 'https://gmail.googleapis.com/gmail/v1/'
-GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3/'
-
-SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/userinfo.email',
-    'openid',
-]
-CALENDAR_SCOPES = SCOPES + [
-    'https://www.googleapis.com/auth/calendar.events',
-]
-
+# Token-based authentication functions
 def get_auth_url(state=None):
     config = get_google_oauth_config()
     params = {
@@ -401,7 +369,7 @@ def calendar_create_event(tokens, calendar_id, event):
         return None, tokens
     headers = {
         'Authorization': f'Bearer {access_token}',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
     }
     resp = requests.post(f'{GOOGLE_CALENDAR_API_BASE}calendars/{calendar_id}/events', headers=headers, json=event)
     resp.raise_for_status()

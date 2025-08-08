@@ -12,27 +12,51 @@ from fastapi import BackgroundTasks
 from pathlib import Path
 import json
 from datetime import datetime
+from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/gmail", tags=["gmail"])
+
+# Initialize services
 gmail_service = GmailService()
 pdf_service = PDFService()
+ai_processor = AIProcessor()
+
+def get_gmail_service_with_tokens():
+    """Get Gmail service instance with authentication tokens."""
+    from app.main import _tokens
+    if not _tokens:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated with Gmail. Please sign in first."
+        )
+    
+    service = GmailService()
+    service.set_tokens(_tokens)
+    return service
 
 @router.get("/auth-status")
 async def check_auth_status():
-    """Check Gmail authentication status."""
+    """Check if Gmail API is authenticated."""
     try:
-        is_authenticated = gmail_service.authenticate()
-        return {"status": "authenticated" if is_authenticated else "not_authenticated"}
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        is_authenticated = gmail_service_with_tokens.authenticate()
+        return {
+            "authenticated": is_authenticated,
+            "status": "connected" if is_authenticated else "disconnected"
+        }
     except HTTPException as e:
-        return {"status": "not_authenticated", "error": e.detail}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "authenticated": False,
+            "status": "error",
+            "error": str(e.detail)
+        }
 
 @router.get("/fetch-pdfs")
-async def fetch_pdfs(max_results: int = 10) -> List[Dict]:
+async def fetch_pdfs(max_results: int = 10, email_filter: str = None) -> List[Dict]:
     """Fetch PDF attachments from Gmail."""
     try:
-        attachments = gmail_service.get_pdf_attachments(max_results)
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        attachments = gmail_service_with_tokens.get_pdf_attachments(max_results, email_filter)
         return attachments
     except HTTPException as e:
         raise e
@@ -41,10 +65,15 @@ async def fetch_pdfs(max_results: int = 10) -> List[Dict]:
 
 @router.post("/download-and-store/{message_id}/{attachment_id}")
 async def download_and_store_pdf(message_id: str, attachment_id: str):
-    """Download and store a PDF attachment locally."""
+    """Download and store a PDF attachment from Gmail."""
     try:
-        result = gmail_service.download_and_store_pdf(message_id, attachment_id)
-        return result
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        result = gmail_service_with_tokens.download_and_store_pdf(message_id, attachment_id)
+        return {
+            "status": "success",
+            "message": "PDF downloaded and stored successfully",
+            "data": result
+        }
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -57,56 +86,40 @@ async def process_pdf_with_ai(
     use_ocr: bool = True,
     background_tasks: BackgroundTasks = None
 ):
-    """Process a downloaded PDF with AI analysis."""
+    """Download, store, and process a PDF with AI."""
     try:
-        print(f"Processing PDF with AI - Message ID: {message_id}, Attachment ID: {attachment_id}")
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
         
-        # Get the file path
-        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
+        # Check if PDF is already stored locally
+        file_path = gmail_service_with_tokens.get_attachment_path(message_id, attachment_id)
         
-        # If file not found, download it first
         if not file_path or not os.path.exists(file_path):
-            print(f"PDF not found locally, downloading first...")
-            download_result = gmail_service.download_and_store_pdf(message_id, attachment_id)
+            # Download and store the PDF first
+            download_result = gmail_service_with_tokens.download_and_store_pdf(message_id, attachment_id)
             file_path = download_result['stored_path']
-            print(f"PDF downloaded and stored at: {file_path}")
         
-        print(f"Found PDF file at: {file_path}")
-        
-        # Initialize AI processor
-        ai_processor = AIProcessor()
-        print(f"AI processor initialized with provider: {ai_processor.provider}")
-        
-        # Process the PDF
-        print("Starting PDF processing...")
-        result = ai_processor.process_pdf(str(file_path), use_ocr=use_ocr)
-        print(f"PDF processing completed, result keys: {list(result.keys())}")
-        
-        # Store the result
+        # Process with AI
         if background_tasks:
             background_tasks.add_task(
-                gmail_service.store_ai_result,
-                message_id,
-                attachment_id,
-                result
+                gmail_service_with_tokens.store_ai_result,
+                message_id, attachment_id, ai_processor.process_pdf(file_path)
             )
-        
-        return {
-            "message": "PDF processed successfully",
-            "result": result,
-            "file_path": str(file_path)
-        }
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
+            return {
+                "status": "processing",
+                "message": "PDF processing started in background"
+            }
+        else:
+            result = ai_processor.process_pdf(file_path)
+            gmail_service_with_tokens.store_ai_result(message_id, attachment_id, result)
+            return {
+                "status": "completed",
+                "message": "PDF processed successfully",
+                "result": result
+            }
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        print(f"Unexpected error in process-with-ai: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to process PDF with AI: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/stored-pdfs")
 async def list_stored_pdfs():
@@ -133,19 +146,24 @@ async def delete_stored_pdf(filename: str):
 
 @router.get("/download/{message_id}/{attachment_id}")
 async def download_pdf(message_id: str, attachment_id: str):
-    """Download a specific PDF attachment."""
+    """Download a PDF attachment from Gmail."""
     try:
-        attachment = gmail_service.download_attachment(message_id, attachment_id)
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        attachment = gmail_service_with_tokens.download_attachment(message_id, attachment_id)
         
-        # Decode base64 data
+        if not attachment or 'data' not in attachment:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+        
+        # Decode the attachment data
         pdf_data = base64.urlsafe_b64decode(attachment['data'])
         
-        # Create a streaming response
-        return StreamingResponse(
-            io.BytesIO(pdf_data),
-            media_type=attachment['content_type'],
+        # Return the PDF as a file response
+        from fastapi.responses import Response
+        return Response(
+            content=pdf_data,
+            media_type="application/pdf",
             headers={
-                'Content-Disposition': f'attachment; filename="document.pdf"'
+                "Content-Disposition": f"attachment; filename={attachment['metadata']['subject']}.pdf"
             }
         )
     except HTTPException as e:
@@ -154,12 +172,41 @@ async def download_pdf(message_id: str, attachment_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sync-pdfs")
-async def sync_pdfs_from_gmail(max_results: int = 10):
+async def sync_pdfs_from_gmail(max_results: int = 10, email_filter: str = None):
     """Sync PDF attachments from Gmail to local storage."""
     import traceback
     try:
         print("[DEBUG] Starting Gmail sync...")
-        attachments = gmail_service.get_pdf_attachments(max_results)
+        
+        # Get the global tokens from main.py
+        from app.main import _tokens
+        if not _tokens:
+            raise HTTPException(
+                status_code=401,
+                detail="Not authenticated with Gmail. Please sign in first."
+            )
+        
+        # Create Gmail service instance and set tokens
+        gmail_service = GmailService()
+        gmail_service.set_tokens(_tokens)
+        
+        # Check if Gmail service can authenticate
+        try:
+            attachments = gmail_service.get_pdf_attachments(max_results, email_filter)
+        except HTTPException as e:
+            if "No authentication tokens" in str(e.detail):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Not authenticated with Gmail. Please sign in first."
+                )
+            elif "Authentication tokens are invalid" in str(e.detail):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Gmail authentication expired. Please sign in again."
+                )
+            else:
+                raise e
+        
         print(f"[DEBUG] Attachments found: {len(attachments)}")
         for i, att in enumerate(attachments):
             print(f"[DEBUG] Attachment {i+1}: {att}")
@@ -188,22 +235,25 @@ async def sync_pdfs_from_gmail(max_results: int = 10):
                 else:
                     print(f"[DEBUG] No data returned for attachment: {attachment}")
                     print(f"[DEBUG] pdf_info: {pdf_info}")
+                    
             except Exception as e:
                 print(f"[ERROR] Failed to sync PDF {attachment.get('subject', 'unknown')}: {str(e)}")
-                print(f"[ERROR] Traceback: {traceback.format_exc()}")
                 continue
         
-        print(f"[DEBUG] Sync complete. Synced {synced_count} of {len(attachments)} attachments.")
         return {
+            "status": "success",
             "message": f"Successfully synced {synced_count} PDFs from Gmail",
             "synced_count": synced_count,
-            "total_attachments": len(attachments)
+            "total_found": len(attachments)
         }
         
     except Exception as e:
         print(f"[ERROR] Exception in sync_pdfs_from_gmail: {str(e)}")
         print(f"[ERROR] Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to sync PDFs from Gmail: {str(e)}"
+        )
 
 @router.get("/local/list-pdfs")
 async def local_list_pdfs():
@@ -230,15 +280,13 @@ async def local_process_with_ai(message_id: str, attachment_id: str, use_ocr: bo
     try:
         print(f"Local processing - Message ID: {message_id}, Attachment ID: {attachment_id}")
         
-        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        file_path = gmail_service_with_tokens.get_attachment_path(message_id, attachment_id)
         if not file_path or not os.path.exists(file_path):
             print(f"Local PDF not found: {file_path}")
             raise HTTPException(status_code=404, detail="Local PDF not found. Please sync first.")
         
         print(f"Found local PDF at: {file_path}")
-        
-        ai_processor = AIProcessor()
-        print(f"AI processor initialized with provider: {ai_processor.provider}")
         
         print("Starting PDF processing...")
         result = ai_processor.process_pdf(str(file_path), use_ocr=use_ocr)
@@ -246,7 +294,7 @@ async def local_process_with_ai(message_id: str, attachment_id: str, use_ocr: bo
         
         if background_tasks:
             background_tasks.add_task(
-                gmail_service.store_ai_result,
+                gmail_service_with_tokens.store_ai_result,
                 message_id,
                 attachment_id,
                 result
@@ -271,15 +319,13 @@ async def extract_ocr_text(message_id: str, attachment_id: str):
     try:
         print(f"Extracting OCR text - Message ID: {message_id}, Attachment ID: {attachment_id}")
         
-        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        file_path = gmail_service_with_tokens.get_attachment_path(message_id, attachment_id)
         if not file_path or not os.path.exists(file_path):
             print(f"Local PDF not found: {file_path}")
             raise HTTPException(status_code=404, detail="Local PDF not found. Please sync first.")
         
         print(f"Found local PDF at: {file_path}")
-        
-        # Initialize AI processor just for OCR
-        ai_processor = AIProcessor()
         
         # Extract text using OCR
         print("Starting OCR text extraction...")
@@ -298,15 +344,14 @@ async def extract_ocr_text(message_id: str, attachment_id: str):
             "ocr_text": ocr_text,
             "text_length": len(ocr_text),
             "file_path": str(file_path),
-            "metadata": metadata,
-            "extracted_at": datetime.now().isoformat()
+            "metadata": metadata
         }
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        print(f"Unexpected error in OCR extraction: {str(e)}")
+        print(f"Unexpected error in extract-ocr: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
@@ -315,73 +360,83 @@ async def extract_ocr_text(message_id: str, attachment_id: str):
 
 @router.get("/local/test-ocr-engines/{message_id}/{attachment_id}")
 async def test_ocr_engines(message_id: str, attachment_id: str):
-    """Test different OCR engines on the same PDF to compare performance."""
+    """Test different OCR engines on a local PDF."""
     try:
         print(f"Testing OCR engines - Message ID: {message_id}, Attachment ID: {attachment_id}")
         
-        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        file_path = gmail_service_with_tokens.get_attachment_path(message_id, attachment_id)
         if not file_path or not os.path.exists(file_path):
             print(f"Local PDF not found: {file_path}")
             raise HTTPException(status_code=404, detail="Local PDF not found. Please sync first.")
         
         print(f"Found local PDF at: {file_path}")
         
-        # Initialize AI processor
-        ai_processor = AIProcessor()
-        
-        # Test both OCR engines
+        # Test different OCR engines
         results = {}
+        
+        # Test Tesseract
+        try:
+            print("Testing Tesseract OCR...")
+            tesseract_text = ai_processor.extract_text_with_tesseract(str(file_path))
+            results['tesseract'] = {
+                'text': tesseract_text,
+                'length': len(tesseract_text),
+                'status': 'success'
+            }
+        except Exception as e:
+            results['tesseract'] = {
+                'text': '',
+                'length': 0,
+                'status': 'error',
+                'error': str(e)
+            }
         
         # Test EasyOCR
         try:
             print("Testing EasyOCR...")
-            easyocr_text = ai_processor._extract_with_easyocr(str(file_path))
-            results["easyocr"] = {
-                "text": easyocr_text,
-                "length": len(easyocr_text),
-                "status": "success"
+            easyocr_text = ai_processor.extract_text_with_easyocr(str(file_path))
+            results['easyocr'] = {
+                'text': easyocr_text,
+                'length': len(easyocr_text),
+                'status': 'success'
             }
         except Exception as e:
-            results["easyocr"] = {
-                "text": "",
-                "length": 0,
-                "status": "failed",
-                "error": str(e)
+            results['easyocr'] = {
+                'text': '',
+                'length': 0,
+                'status': 'error',
+                'error': str(e)
             }
         
-        # Test Tesseract
+        # Test PaddleOCR
         try:
-            print("Testing Tesseract...")
-            tesseract_text = ai_processor._extract_with_tesseract_from_path(str(file_path))
-            results["tesseract"] = {
-                "text": tesseract_text,
-                "length": len(tesseract_text),
-                "status": "success"
+            print("Testing PaddleOCR...")
+            paddleocr_text = ai_processor.extract_text_with_paddleocr(str(file_path))
+            results['paddleocr'] = {
+                'text': paddleocr_text,
+                'length': len(paddleocr_text),
+                'status': 'success'
             }
         except Exception as e:
-            results["tesseract"] = {
-                "text": "",
-                "length": 0,
-                "status": "failed",
-                "error": str(e)
+            results['paddleocr'] = {
+                'text': '',
+                'length': 0,
+                'status': 'error',
+                'error': str(e)
             }
         
         return {
-            "message": "OCR engine comparison completed",
+            "message": "OCR engine testing completed",
             "file_path": str(file_path),
-            "results": results,
-            "comparison": {
-                "easyocr_length": results["easyocr"]["length"],
-                "tesseract_length": results["tesseract"]["length"],
-                "recommended": "easyocr" if results["easyocr"]["length"] > results["tesseract"]["length"] else "tesseract"
-            }
+            "results": results
         }
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        print(f"Unexpected error in OCR engine test: {str(e)}")
+        print(f"Unexpected error in OCR engine testing: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
@@ -390,11 +445,12 @@ async def test_ocr_engines(message_id: str, attachment_id: str):
 
 @router.post("/local/process-with-multimodal/{message_id}/{attachment_id}")
 async def process_pdf_with_multimodal(message_id: str, attachment_id: str):
-    """Process a local PDF using multimodal LLM (Ollama + LLaVA) for better handwritten text recognition."""
+    """Process a local PDF using multimodal LLM (LLaVA) for better handwritten text recognition."""
     try:
         print(f"Multimodal processing - Message ID: {message_id}, Attachment ID: {attachment_id}")
         
-        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        file_path = gmail_service_with_tokens.get_attachment_path(message_id, attachment_id)
         if not file_path or not os.path.exists(file_path):
             print(f"Local PDF not found: {file_path}")
             raise HTTPException(status_code=404, detail="Local PDF not found. Please sync first.")
@@ -402,7 +458,6 @@ async def process_pdf_with_multimodal(message_id: str, attachment_id: str):
         print(f"Found local PDF at: {file_path}")
         
         # Initialize AI processor with multimodal provider
-        ai_processor = AIProcessor()
         # Temporarily set provider to multimodal for this request
         original_provider = ai_processor.provider
         ai_processor.provider = "multimodal"
@@ -415,7 +470,7 @@ async def process_pdf_with_multimodal(message_id: str, attachment_id: str):
         ai_processor.provider = original_provider
         
         # Store the result
-        gmail_service.store_ai_result(message_id, attachment_id, result)
+        gmail_service_with_tokens.store_ai_result(message_id, attachment_id, result)
         
         return {
             "message": "Multimodal PDF processing completed successfully", 
@@ -441,7 +496,8 @@ async def process_pdf_with_openai_multimodal(message_id: str, attachment_id: str
     try:
         print(f"OpenAI Multimodal processing - Message ID: {message_id}, Attachment ID: {attachment_id}")
         
-        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        file_path = gmail_service_with_tokens.get_attachment_path(message_id, attachment_id)
         if not file_path or not os.path.exists(file_path):
             print(f"Local PDF not found: {file_path}")
             raise HTTPException(status_code=404, detail="Local PDF not found. Please sync first.")
@@ -449,7 +505,6 @@ async def process_pdf_with_openai_multimodal(message_id: str, attachment_id: str
         print(f"Found local PDF at: {file_path}")
         
         # Initialize AI processor with OpenAI multimodal provider
-        ai_processor = AIProcessor()
         # Temporarily set provider to openai_multimodal for this request
         original_provider = ai_processor.provider
         ai_processor.provider = "openai_multimodal"
@@ -462,7 +517,7 @@ async def process_pdf_with_openai_multimodal(message_id: str, attachment_id: str
         ai_processor.provider = original_provider
         
         # Store the result
-        gmail_service.store_ai_result(message_id, attachment_id, result)
+        gmail_service_with_tokens.store_ai_result(message_id, attachment_id, result)
         
         return {
             "message": "OpenAI multimodal PDF processing completed successfully", 
@@ -537,36 +592,20 @@ async def get_result(message_id: str, attachment_id: str):
 
 @router.get("/local/view-pdf/{message_id}/{attachment_id}")
 async def view_pdf_local(message_id: str, attachment_id: str):
-    """View a local PDF by Gmail message_id and attachment_id."""
+    """View a locally stored PDF file."""
     try:
-        print(f"Viewing local PDF - Message ID: {message_id}, Attachment ID: {attachment_id}")
+        gmail_service_with_tokens = get_gmail_service_with_tokens()
+        file_path = gmail_service_with_tokens.get_attachment_path(message_id, attachment_id)
         
-        # Find the local file path by looking up the metadata
-        file_path = gmail_service.get_attachment_path(message_id, attachment_id)
         if not file_path or not os.path.exists(file_path):
-            print(f"Local PDF not found: {file_path}")
-            raise HTTPException(status_code=404, detail="Local PDF not found. Please sync first.")
+            raise HTTPException(status_code=404, detail="PDF not found locally. Please sync first.")
         
-        print(f"Found local PDF at: {file_path}")
-        
-        # Read the PDF file
-        with open(file_path, 'rb') as f:
-            pdf_data = f.read()
-        
-        # Get the original filename from metadata
-        meta_file = Path(file_path).with_suffix('.json')
-        filename = "document.pdf"
-        if meta_file.exists():
-            with open(meta_file, 'r') as f:
-                metadata = json.load(f)
-                filename = metadata.get('filename', 'document.pdf')
-        
-        # Create a streaming response
-        return StreamingResponse(
-            io.BytesIO(pdf_data),
-            media_type='application/pdf',
+        # Return the PDF file
+        return FileResponse(
+            path=file_path,
+            media_type="application/pdf",
             headers={
-                'Content-Disposition': f'inline; filename="{filename}"'
+                "Content-Disposition": f"inline; filename={os.path.basename(file_path)}"
             }
         )
         
@@ -574,11 +613,11 @@ async def view_pdf_local(message_id: str, attachment_id: str):
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        print(f"Unexpected error in view_pdf_local: {str(e)}")
+        print(f"Unexpected error in view-pdf: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to view local PDF: {str(e)}"
+            detail=f"Failed to view PDF: {str(e)}"
         )
 
 @router.post("/upload-pdf")
