@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from app.services.gmail_service import GmailService
 from app.services.pdf_service import PDFService
 from app.services.ai_processor import AIProcessor
+from app.services.db_integration import save_note_to_database, save_ai_result_to_database
 from typing import List, Dict
 import base64
 import io
@@ -82,19 +83,31 @@ async def process_pdf_with_ai(
         result = ai_processor.process_pdf(str(file_path), use_ocr=use_ocr)
         print(f"PDF processing completed, result keys: {list(result.keys())}")
         
-        # Store the result
-        if background_tasks:
-            background_tasks.add_task(
-                gmail_service.store_ai_result,
-                message_id,
-                attachment_id,
-                result
+        # Store the result in database
+        try:
+            note_id = save_ai_result_to_database(
+                message_id=message_id,
+                attachment_id=attachment_id,
+                ai_result=result,
+                processing_method=ai_processor.provider,
             )
+            print(f"AI result saved to database for note ID: {note_id}")
+        except Exception as e:
+            print(f"Error saving to database: {str(e)}")
+            # Fallback to file storage
+            if background_tasks:
+                background_tasks.add_task(
+                    gmail_service.store_ai_result,
+                    message_id,
+                    attachment_id,
+                    result
+                )
         
         return {
             "message": "PDF processed successfully",
             "result": result,
-            "file_path": str(file_path)
+            "file_path": str(file_path),
+            "note_id": note_id if 'note_id' in locals() else None
         }
         
     except HTTPException:
@@ -180,9 +193,28 @@ async def sync_pdfs_from_gmail(max_results: int = 10):
                     print(f"[DEBUG] pdf_info['data'] type: {type(pdf_info['data'])}")
                     pdf_data = base64.urlsafe_b64decode(pdf_info['data'])
                     print(f"[DEBUG] pdf_data type: {type(pdf_data)}, length: {len(pdf_data)}")
+                    
                     # Store the PDF locally
                     filename = f"{attachment['subject']}.pdf"
                     file_path = pdf_service.store_pdf(pdf_data, filename, attachment)
+                    
+                    # Save to database
+                    try:
+                        note_id = save_note_to_database(
+                            message_id=attachment['message_id'],
+                            attachment_id=attachment['attachment_id'],
+                            subject=attachment['subject'],
+                            filename=filename,
+                            file_path=file_path,
+                            from_email=attachment.get('from', 'Unknown'),
+                            received_at=datetime.fromtimestamp(int(attachment['date']) / 1000) if 'date' in attachment else None,
+                            file_size=len(pdf_data),
+                            file_data=pdf_data,
+                        )
+                        print(f"[DEBUG] Synced PDF to database: {filename} (Note ID: {note_id})")
+                    except Exception as e:
+                        print(f"[DEBUG] Error saving to database: {str(e)}")
+                    
                     synced_count += 1
                     print(f"[DEBUG] Synced PDF: {filename} at {file_path}")
                 else:

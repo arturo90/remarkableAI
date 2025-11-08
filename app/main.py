@@ -3,12 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from app.api import gmail
+from app.db.base import init_db
+from app.db.init_db import create_default_user
 
 app = FastAPI(
     title="RemarkableAI",
     description="An intelligent note processing system for Remarkable tablet notes",
-    version="1.0.0"
+    version="2.0.0"
 )
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup."""
+    init_db()
+    create_default_user()
 
 # Configure templates
 templates = Jinja2Templates(directory="app/templates")
@@ -24,6 +33,11 @@ app.add_middleware(
 
 # Include routers
 app.include_router(gmail.router)
+
+# Import and include new API routers
+from app.api import notes, tasks
+app.include_router(notes.router)
+app.include_router(tasks.router)
 
 @app.get("/")
 async def root(request: Request):
