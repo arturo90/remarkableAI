@@ -80,6 +80,17 @@ async def get_tasks(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/statistics", response_model=dict)
+async def get_task_statistics(
+    db: Session = Depends(get_db),
+):
+    """Get task statistics."""
+    try:
+        stats = TaskService.get_task_statistics(db=db, user_id=1)
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/{task_id}", response_model=dict)
 async def get_task(
     task_id: int,
@@ -193,17 +204,6 @@ async def search_tasks(
             }
             for task in tasks
         ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/statistics", response_model=dict)
-async def get_task_statistics(
-    db: Session = Depends(get_db),
-):
-    """Get task statistics."""
-    try:
-        stats = TaskService.get_task_statistics(db=db, user_id=1)
-        return stats
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
